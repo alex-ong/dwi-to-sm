@@ -1,0 +1,46 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+build/
+dist/
+sdist/
+wheels/
+*.egg-info/
+*.egg
+MANIFEST
+
+# Unit test / coverage reports
+.pytest_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.hypothesis/
+.mypy_cache/
+.pyright/
+.ruff_cache/
+
+# Environments
+.venv/
+venv/
+env/
+.env
+.envrc
+
+# uv
+# uv.lock is committed on purpose so builds are reproducible.
+
+# Editors / OS
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Converter output produced while testing
+/out/
+out.sm
