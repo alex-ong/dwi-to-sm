@@ -1,7 +1,8 @@
 """Parsing of the DWI simfile format.
 
-The rules follow StepMania's ``NotesLoaderDWI.cpp`` so timing, jumps, holds and
-the 6-panel (solo) character set behave the same way the game does.
+The rules here mirror StepMania's own DWI loader, so timing, jumps, holds and
+the 6-panel (solo) character set behave the same way the game does:
+https://github.com/stepmania/stepmania/blob/5_1-new/src/NotesLoaderDWI.cpp
 """
 
 from __future__ import annotations
@@ -30,6 +31,7 @@ ROWS_PER_MEASURE = ROWS_PER_BEAT * 4
 # Panel names used as an intermediate, pad-independent representation.
 L, D, U, R, UL, UR = "L", "D", "U", "R", "UL", "UR"
 
+# Mirrors DWIcharToNote() in NotesLoaderDWI.cpp.
 DWI_CHARS: Dict[str, Tuple[str, ...]] = {
     "0": (),
     "1": (D, L),
@@ -68,6 +70,7 @@ MODES: Dict[str, Tuple[str, Dict[str, int], int, int]] = {
     "SOLO": ("dance-solo", _SOLO_COLS, 6, 1),
 }
 
+# Mirrors DwiCompatibleStringToDifficulty() in NotesLoaderDWI.cpp.
 DIFFICULTIES: Dict[str, str] = {
     "BEGINNER": "Beginner",
     "EASY": "Easy",
@@ -135,7 +138,11 @@ def _strip_comments(text: str) -> str:
 
 
 def _parse_msd(text: str) -> List[List[str]]:
-    """Split a MSD-style file into ``[tag, param, param, ...]`` lists."""
+    """Split a MSD-style file into ``[tag, param, param, ...]`` lists.
+
+    See MsdFile.cpp:
+    https://github.com/stepmania/stepmania/blob/5_1-new/src/MsdFile.cpp
+    """
     text = _strip_comments(text)
     values: List[List[str]] = []
     i, n = 0, len(text)
@@ -166,7 +173,11 @@ def _parse_msd(text: str) -> List[List[str]]:
 
 
 def _is_192(data: str, pos: int) -> bool:
-    """`<...>` means 1/192nds if it contains a '0', otherwise it's a jump."""
+    """`<...>` means 1/192nds if it contains a '0', otherwise it's a jump.
+
+    Same heuristic as OneLineIs192nd() in NotesLoaderDWI.cpp: DWI originally
+    used `<...>` for 192nds and later reused it for jumps.
+    """
     for c in data[pos:]:
         if c == ">":
             return False

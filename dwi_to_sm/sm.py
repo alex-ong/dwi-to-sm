@@ -1,4 +1,8 @@
-"""Rendering a parsed DWI song as SM file contents."""
+"""Rendering a parsed DWI song as SM file contents.
+
+Tag order and the ``#NOTES`` block layout follow StepMania's SM writer:
+https://github.com/stepmania/stepmania/blob/5_1-new/src/NotesWriterSM.cpp
+"""
 
 from __future__ import annotations
 
@@ -19,7 +23,10 @@ def _fmt(value: float, places: int = 3) -> str:
 
 
 def _parse_timestamp(parts: Sequence[str]) -> float:
-    """DWI timestamps are ms, seconds, MM:SS.sss or HH:MM:SS.sss."""
+    """DWI timestamps are ms, seconds, MM:SS.sss or HH:MM:SS.sss.
+
+    Ported from ParseBrokenDWITimestamp() in NotesLoaderDWI.cpp.
+    """
     parts = [p for p in parts if p != ""]
     if not parts:
         return 0.0
@@ -75,7 +82,7 @@ def _build_header(song: DwiSong, source_dir: str, base_name: str) -> str:
         bpms.append("0.000=60.000")
     change = song.tag("CHANGEBPM") or song.tag("BPMCHANGE")
     if change:
-        # DWI counts CHANGEBPM/FREEZE positions in quarter-beats.
+        # NotesLoaderDWI.cpp divides CHANGEBPM/FREEZE positions by 4 to get beats.
         bpms.extend(_convert_pairs(change, 0.25, 1.0))
 
     stops = _convert_pairs(song.tag("FREEZE"), 0.25, 0.001) if song.tag("FREEZE") else []
@@ -106,7 +113,7 @@ def _build_header(song: DwiSong, source_dir: str, base_name: str) -> str:
         lines.append(f"#SAMPLESTART:{_fmt(_parse_timestamp(song.params('SAMPLESTART')))};")
     if song.params("SAMPLELENGTH"):
         length = _parse_timestamp(song.params("SAMPLELENGTH"))
-        if 0 < length < 1:  # some files store this in seconds-as-ms
+        if 0 < length < 1:  # NotesLoaderDWI.cpp: some files store this in seconds
             length *= 1000
         lines.append(f"#SAMPLELENGTH:{_fmt(length)};")
 
@@ -152,6 +159,7 @@ def _chart_body(chart: DwiChart) -> str:
 
 
 def _chart_to_sm(chart: DwiChart, description: str = "") -> str:
+    # Block layout matches GetSMNotesTag() in NotesWriterSM.cpp.
     return (
         f"\n//---------------{chart.steps_type} - {description}----------------\n"
         "#NOTES:\n"

@@ -2,9 +2,12 @@
 
 Convert StepMania **DWI** simfiles to the **SM** format.
 
-Parsing follows StepMania's `NotesLoaderDWI.cpp`, so timing (`BPM`, `CHANGEBPM`,
-`FREEZE`, `GAP`), jumps, holds, and the 6-panel solo character set behave the way
-the game does. Note data round-trips exactly against StepMania's own output.
+Parsing follows StepMania's own loader,
+[NotesLoaderDWI.cpp](https://github.com/stepmania/stepmania/blob/5_1-new/src/NotesLoaderDWI.cpp),
+so timing (`BPM`, `CHANGEBPM`, `FREEZE`, `GAP`), jumps, holds, and the 6-panel
+solo character set behave the way the game does. Output follows
+[NotesWriterSM.cpp](https://github.com/stepmania/stepmania/blob/5_1-new/src/NotesWriterSM.cpp).
+Note data round-trips exactly against StepMania's own output.
 
 ## Setup
 
