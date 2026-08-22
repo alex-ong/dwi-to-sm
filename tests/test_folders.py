@@ -62,6 +62,15 @@ def test_test_folder_writes_alongside_the_original(reference_song):
     assert (reference_song / "A.sm").read_bytes() == before
 
 
+def test_autoconverted_folders_are_not_worth_diffing(tmp_path, dwi_only_song,
+                                                     reference_song):
+    autoconvert_folder(str(dwi_only_song))
+
+    assert find_testable_folders(str(tmp_path)) == [str(reference_song)]
+    assert test_folder(str(dwi_only_song)) == []
+    assert not (dwi_only_song / "B.sm.converted").exists()
+
+
 def test_clear_only_removes_marked_folders(tmp_path, dwi_only_song, reference_song):
     autoconvert_folder(str(dwi_only_song))
 

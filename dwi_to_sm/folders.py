@@ -49,8 +49,13 @@ def find_convertible_folders(root: str) -> List[str]:
 
 
 def find_testable_folders(root: str) -> List[str]:
-    """Every folder under ``root`` that has both .dwi and .sm, for diffing."""
-    return [d for d, _, _ in os.walk(root) if all(_simfiles(d))]
+    """Folders under ``root`` with a hand-made .sm to diff a fresh conversion against.
+
+    Autoconverted folders are excluded: diffing our output against our own
+    output proves nothing.
+    """
+    return [d for d, _, _ in os.walk(root)
+            if all(_simfiles(d)) and not is_autoconverted(d)]
 
 
 def is_autoconverted(folder: str) -> bool:
@@ -65,8 +70,10 @@ def autoconvert_folder(folder: str, overwrite: bool = False) -> List[str]:
     if scan_folder(folder) is None:
         return []
     dwi, _ = _simfiles(folder)
-    written = [convert_file(os.path.join(folder, name), overwrite=overwrite)
-               for name in dwi]
+    written = [path for path in
+               (convert_file(os.path.join(folder, name), overwrite=overwrite)
+                for name in dwi)
+               if path is not None]
     if written:
         with open(os.path.join(folder, AUTOCONVERT_MARKER), "w",
                   encoding="utf-8", newline="\n") as handle:
@@ -91,20 +98,24 @@ def autoconvert_tree(root: str, overwrite: bool = False) -> List[FolderResult]:
 def test_folder(folder: str) -> List[str]:
     """Convert a folder that already has an .sm, writing ``<name>.sm.converted``.
 
-    The real .sm is never touched, so the two can be diffed.
+    The real .sm is never touched, so the two can be diffed. Folders we
+    autoconverted ourselves are skipped.
     """
     dwi, sm = _simfiles(folder)
-    if not (dwi and sm):
+    if not (dwi and sm) or is_autoconverted(folder):
         return []
     written = []
     for name in dwi:
         src = os.path.join(folder, name)
-        written.append(convert_file(src, os.path.splitext(src)[0] + ".sm.converted"))
+        path = convert_file(src, os.path.splitext(src)[0] + ".sm.converted",
+                            overwrite=True)
+        if path is not None:
+            written.append(path)
     return written
 
 
 def test_tree(root: str) -> List[FolderResult]:
-    """Write ``<name>.sm.converted`` in every folder under ``root`` that has both."""
+    """Write ``<name>.sm.converted`` beside every hand-made .sm under ``root``."""
     results: List[FolderResult] = []
     for folder in find_testable_folders(root):
         try:

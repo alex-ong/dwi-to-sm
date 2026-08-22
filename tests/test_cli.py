@@ -9,10 +9,29 @@ def test_cli_converts_a_single_file(tmp_path, reference_song, capsys):
     assert "OK" in capsys.readouterr().out
 
 
-def test_cli_auto_skips_folders_that_already_have_an_sm(tmp_path, dwi_only_song,
+def test_cli_never_overwrites_an_existing_sm(reference_song, capsys):
+    before = (reference_song / "A.sm").read_bytes()
+
+    assert main([str(reference_song / "A.dwi")]) == 0
+    assert (reference_song / "A.sm").read_bytes() == before
+    assert "SKIP" in capsys.readouterr().out
+
+
+def test_cli_force_allows_overwriting(reference_song):
+    before = (reference_song / "A.sm").read_bytes()
+
+    assert main([str(reference_song / "A.dwi"), "--force"]) == 0
+    assert (reference_song / "A.sm").read_bytes() != before
+
+
+def test_cli_folder_run_leaves_folders_with_an_sm_alone(tmp_path, dwi_only_song,
                                                         reference_song):
-    assert main([str(tmp_path), "--auto"]) == 0
+    before = (reference_song / "A.sm").read_bytes()
+
+    assert main([str(tmp_path)]) == 0
     assert (dwi_only_song / "B.sm").exists()
+    assert (dwi_only_song / "autoconvert.txt").exists()
+    assert (reference_song / "A.sm").read_bytes() == before
     assert not (reference_song / "autoconvert.txt").exists()
 
 
@@ -21,8 +40,15 @@ def test_cli_test_mode_writes_converted_files(tmp_path, reference_song):
     assert (reference_song / "A.sm.converted").exists()
 
 
+def test_cli_test_mode_ignores_autoconverted_folders(tmp_path, dwi_only_song):
+    main([str(tmp_path)])
+
+    assert main([str(tmp_path), "--test"]) == 0
+    assert not (dwi_only_song / "B.sm.converted").exists()
+
+
 def test_cli_clear_removes_autoconversions(tmp_path, dwi_only_song):
-    main([str(tmp_path), "--auto"])
+    main([str(tmp_path)])
 
     assert main([str(tmp_path), "--clear-autoconversions"]) == 0
     assert not (dwi_only_song / "B.sm").exists()

@@ -62,3 +62,13 @@ def test_dwi_to_sm_needs_no_disk_access():
     assert "#BPMS:0.000=120.000;" in sm
     assert "     Easy:" in sm
     assert "#BANNER:;" in sm
+
+
+def test_convert_file_refuses_to_clobber_by_default(reference_song):
+    before = (reference_song / "A.sm").read_bytes()
+
+    assert convert_file(str(reference_song / "A.dwi")) is None
+    assert (reference_song / "A.sm").read_bytes() == before
+
+    assert convert_file(str(reference_song / "A.dwi"), overwrite=True) is not None
+    assert (reference_song / "A.sm").read_bytes() != before

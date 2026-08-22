@@ -25,13 +25,17 @@ def read_text(path: str) -> str:
 
 
 def convert_file(dwi_path: str, sm_path: Optional[str] = None,
-                 overwrite: bool = True, encoding: str = "utf-8") -> str:
-    """Convert one .dwi file. Returns the path of the written .sm file."""
+                 overwrite: bool = False, encoding: str = "utf-8") -> Optional[str]:
+    """Convert one .dwi file.
+
+    Returns the path of the written .sm file, or None if it already existed and
+    ``overwrite`` is False.
+    """
     dwi_path = os.path.abspath(dwi_path)
     if sm_path is None:
         sm_path = os.path.splitext(dwi_path)[0] + ".sm"
     if not overwrite and os.path.exists(sm_path):
-        return sm_path
+        return None
 
     base_name = os.path.splitext(os.path.basename(dwi_path))[0]
     sm_text = dwi_to_sm(read_text(dwi_path), os.path.dirname(dwi_path), base_name)
@@ -43,10 +47,11 @@ def convert_file(dwi_path: str, sm_path: Optional[str] = None,
 
 
 def convert_tree(root: str, out_root: Optional[str] = None,
-                 overwrite: bool = True) -> List[Tuple[str, Optional[str], Optional[str]]]:
+                 overwrite: bool = False) -> List[Tuple[str, Optional[str], Optional[str]]]:
     """Convert every .dwi under ``root``.
 
-    Returns ``(dwi_path, sm_path, error)`` per file; ``error`` is None on success.
+    Returns ``(dwi_path, sm_path, error)`` per file. ``sm_path`` is None when the
+    target already existed and was left alone; ``error`` is None on success.
     """
     results: List[Tuple[str, Optional[str], Optional[str]]] = []
     for directory, _, files in os.walk(root):
