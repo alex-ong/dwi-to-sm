@@ -44,3 +44,4 @@ Thumbs.db
 # Converter output produced while testing
 /out/
 out.sm
+*.sm.converted

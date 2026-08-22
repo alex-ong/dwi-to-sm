@@ -1,0 +1,52 @@
+"""DWI -> SM simfile converter.
+
+    from dwi_to_sm import convert_file, autoconvert_tree, dwi_to_sm
+
+    convert_file("song/A.dwi")                 # writes song/A.sm
+    autoconvert_tree("C:/Songs")               # bulk: only .dwi-only folders
+    sm_text = dwi_to_sm(open("A.dwi").read())  # pure string -> string
+"""
+
+from .dwi import DwiChart, DwiError, DwiSong, parse_dwi
+from .files import convert_file, convert_tree, read_text
+from .folders import (
+    AUTOCONVERT_MARKER,
+    AUTOCONVERT_TEXT,
+    autoconvert_folder,
+    autoconvert_tree,
+    clear_autoconversions,
+    find_convertible_folders,
+    find_testable_folders,
+    is_autoconverted,
+    scan_folder,
+    test_folder,
+    test_tree,
+)
+from .images import image_size, pick_banner_background
+from .sm import dwi_to_sm
+
+__version__ = "0.1.0"
+
+__all__ = [
+    "DwiChart",
+    "DwiError",
+    "DwiSong",
+    "parse_dwi",
+    "dwi_to_sm",
+    "read_text",
+    "convert_file",
+    "convert_tree",
+    "image_size",
+    "pick_banner_background",
+    "AUTOCONVERT_MARKER",
+    "AUTOCONVERT_TEXT",
+    "scan_folder",
+    "find_convertible_folders",
+    "find_testable_folders",
+    "is_autoconverted",
+    "autoconvert_folder",
+    "autoconvert_tree",
+    "test_folder",
+    "test_tree",
+    "clear_autoconversions",
+]

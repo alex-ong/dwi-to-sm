@@ -1,0 +1,36 @@
+from dwi_to_sm.cli import main
+
+
+def test_cli_converts_a_single_file(tmp_path, reference_song, capsys):
+    out = tmp_path / "out.sm"
+
+    assert main([str(reference_song / "A.dwi"), "-o", str(out)]) == 0
+    assert out.exists()
+    assert "OK" in capsys.readouterr().out
+
+
+def test_cli_auto_skips_folders_that_already_have_an_sm(tmp_path, dwi_only_song,
+                                                        reference_song):
+    assert main([str(tmp_path), "--auto"]) == 0
+    assert (dwi_only_song / "B.sm").exists()
+    assert not (reference_song / "autoconvert.txt").exists()
+
+
+def test_cli_test_mode_writes_converted_files(tmp_path, reference_song):
+    assert main([str(tmp_path), "--test"]) == 0
+    assert (reference_song / "A.sm.converted").exists()
+
+
+def test_cli_clear_removes_autoconversions(tmp_path, dwi_only_song):
+    main([str(tmp_path), "--auto"])
+
+    assert main([str(tmp_path), "--clear-autoconversions"]) == 0
+    assert not (dwi_only_song / "B.sm").exists()
+
+
+def test_cli_reports_failure_for_a_bad_file(tmp_path, capsys):
+    bad = tmp_path / "bad.dwi"
+    bad.write_text("not a simfile")
+
+    assert main([str(bad)]) == 1
+    assert "FAIL" in capsys.readouterr().out

@@ -1,0 +1,136 @@
+"""Banner/background detection.
+
+DWI has no tags for either image, so they are guessed from the song folder:
+filename hints first, then the image dimensions read straight from the file
+headers (no image library needed).
+"""
+
+from __future__ import annotations
+
+import os
+import struct
+from dataclasses import dataclass
+from typing import List, Optional, Sequence, Tuple
+
+__all__ = ["image_size", "pick_banner_background"]
+
+IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".bmp", ".gif")
+# Banners are wide strips (256x80, 512x160); backgrounds are 4:3 or 16:9.
+BANNER_RATIO = 2.0
+_SKIP_HINTS = ("cdtitle", "jacket", "cdimage", "disc")
+
+
+def image_size(path: str) -> Optional[Tuple[int, int]]:
+    """Read width/height straight from the file header."""
+    try:
+        with open(path, "rb") as handle:
+            head = handle.read(32)
+            if head[:8] == b"\x89PNG\r\n\x1a\n" and head[12:16] == b"IHDR":
+                return struct.unpack(">II", head[16:24])
+            if head[:6] in (b"GIF87a", b"GIF89a"):
+                return struct.unpack("<HH", head[6:10])
+            if head[:2] == b"BM":
+                width, height = struct.unpack("<ii", head[18:26])
+                return abs(width), abs(height)
+            if head[:2] == b"\xff\xd8":
+                handle.seek(2)
+                while True:
+                    marker = handle.read(2)
+                    if len(marker) < 2 or marker[0] != 0xFF:
+                        return None
+                    length = struct.unpack(">H", handle.read(2))[0]
+                    # SOF0..SOF15, excluding the non-frame DHT/JPG/DAC markers.
+                    if 0xC0 <= marker[1] <= 0xCF and marker[1] not in (0xC4, 0xC8, 0xCC):
+                        body = handle.read(5)
+                        height, width = struct.unpack(">HH", body[1:5])
+                        return width, height
+                    handle.seek(length - 2, os.SEEK_CUR)
+    except (OSError, struct.error, IndexError):
+        return None
+    return None
+
+
+@dataclass
+class _Image:
+    name: str
+    width: int
+    height: int
+    bytes: int
+
+    @property
+    def ratio(self) -> float:
+        return self.width / self.height if self.height else 0.0
+
+    @property
+    def area(self) -> int:
+        return self.width * self.height
+
+
+def _list_images(directory: str) -> List[_Image]:
+    if not directory or not os.path.isdir(directory):
+        return []
+    try:
+        entries = sorted(os.listdir(directory))
+    except OSError:
+        return []
+
+    images: List[_Image] = []
+    for name in entries:
+        if not name.lower().endswith(IMAGE_EXTS):
+            continue
+        if any(hint in name.lower() for hint in _SKIP_HINTS):
+            continue
+        path = os.path.join(directory, name)
+        size = image_size(path)
+        if size is None:
+            continue
+        try:
+            on_disk = os.path.getsize(path)
+        except OSError:
+            on_disk = 0
+        images.append(_Image(name, size[0], size[1], on_disk))
+    return images
+
+
+def _classify_by_name(name: str, bases: Sequence[str]) -> Optional[str]:
+    stem = os.path.splitext(name)[0].lower()
+    for base in bases:
+        base = base.lower()
+        if not base:
+            continue
+        if stem == base:
+            return "banner"
+        suffix = stem[len(base):].strip(" -_") if stem.startswith(base) else ""
+        if suffix in ("bg", "background"):
+            return "background"
+        if suffix in ("bn", "banner"):
+            return "banner"
+    if "background" in stem or stem.endswith(("-bg", " bg", "_bg")):
+        return "background"
+    if "banner" in stem or stem.endswith(("-bn", " bn", "_bn")):
+        return "banner"
+    return None
+
+
+def pick_banner_background(directory: str, bases: Sequence[str]) -> Tuple[str, str]:
+    """Guess the banner and background filenames in a song folder."""
+    banner = background = ""
+    unknown: List[_Image] = []
+    for image in _list_images(directory):
+        kind = _classify_by_name(image.name, bases)
+        if kind == "banner" and not banner:
+            banner = image.name
+        elif kind == "background" and not background:
+            background = image.name
+        elif kind is None:
+            unknown.append(image)
+
+    if not banner:
+        wide = [i for i in unknown if i.ratio >= BANNER_RATIO]
+        if wide:
+            banner = min(wide, key=lambda i: i.area).name
+    if not background:
+        rest = [i for i in unknown if i.name != banner and i.ratio < BANNER_RATIO]
+        if rest:
+            background = max(rest, key=lambda i: (i.area, i.bytes)).name
+    return banner, background
