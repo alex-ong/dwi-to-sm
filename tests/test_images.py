@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from dwi_to_sm import Image, choose_banner_background, image_size
+from dwi_to_sm import Image, choose_banner_background, image_size, list_images
 
 IMAGES = Path(__file__).parent / "data" / "images"
 
@@ -130,3 +130,18 @@ def test_non_song_art_is_ignored(name):
 
 def test_no_images_at_all():
     assert choose_banner_background([]) == ("", "")
+
+
+def test_explicit_banner_does_not_block_background_selection():
+    images = [Image("song.png", 256, 80), Image("song-bg.png", 640, 480)]
+
+    assert choose_banner_background(images, ("song",), need_banner=False) == ("", "song-bg.png")
+
+
+def test_list_images_returns_all_readable_supported_images(tmp_path):
+    (tmp_path / "banner.png").write_bytes(
+        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR" + (256).to_bytes(4, "big") + (80).to_bytes(4, "big")
+    )
+    (tmp_path / "notes.txt").write_text("not an image")
+
+    assert [image.name for image in list_images(str(tmp_path))] == ["banner.png"]

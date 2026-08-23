@@ -11,7 +11,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from .dwi import ROWS_PER_MEASURE, DwiChart, DwiSong, parse_dwi
-from .images import pick_banner_background
+from .images import choose_banner_background, list_images
 
 __all__ = ["dwi_to_sm"]
 
@@ -88,11 +88,20 @@ def _build_header(song: DwiSong, source_dir: str, base_name: str) -> str:
 
     stops = _convert_pairs(song.tag("FREEZE"), 0.25, 0.001) if song.tag("FREEZE") else []
 
-    guessed_banner, guessed_background = pick_banner_background(
-        source_dir, (base_name, title, Path(source_dir).name)
+    banner = song.tag("BANNER")
+    background = song.tag("BACKGROUND")
+    guessed_banner, guessed_background = choose_banner_background(
+        list_images(source_dir),
+        (base_name, title, Path(source_dir).name),
+        need_banner=not banner,
+        need_background=not background,
     )
-    banner = song.tag("BANNER") or guessed_banner
-    background = song.tag("BACKGROUND") or guessed_background
+    banner = banner or guessed_banner
+    background = background or guessed_background
+
+    lyric_path = song.tag("LYRICSPATH") or song.tag("LYRICS") or _find_lyrics(
+        source_dir, (base_name, title)
+    )
 
     lines = [
         f"#TITLE:{title};",
@@ -105,7 +114,7 @@ def _build_header(song: DwiSong, source_dir: str, base_name: str) -> str:
         f"#CREDIT:{song.tag('CREDIT')};",
         f"#BANNER:{banner};",
         f"#BACKGROUND:{background};",
-        "#LYRICSPATH:;",
+        f"#LYRICSPATH:{lyric_path};",
         f"#CDTITLE:{song.tag('CDTITLE')};",
         f"#MUSIC:{song.tag('FILE')};",
         f"#OFFSET:{_fmt(-gap)};",
@@ -130,6 +139,22 @@ def _build_header(song: DwiSong, source_dir: str, base_name: str) -> str:
     lines.append("#BGCHANGES:;")
     lines.append("#KEYSOUNDS:;")
     return "\n".join(lines) + "\n"
+
+
+def _find_lyrics(directory: str, bases: Sequence[str]) -> str:
+    if not directory or not Path(directory).is_dir():
+        return ""
+    lyric_extensions = {".lrc", ".lyrics"}
+    candidates = sorted(
+        path
+        for path in Path(directory).iterdir()
+        if path.is_file() and path.suffix.lower() in lyric_extensions
+    )
+    if not candidates:
+        return ""
+    normalized_bases = {Path(base).stem.casefold() for base in bases if base}
+    preferred = [path for path in candidates if path.stem.casefold() in normalized_bases]
+    return (preferred or candidates)[0].name
 
 
 def _measure_rows(rows: Sequence[int]) -> int:

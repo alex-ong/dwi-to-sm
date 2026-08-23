@@ -12,7 +12,13 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-__all__ = ["Image", "choose_banner_background", "image_size", "pick_banner_background"]
+__all__ = [
+    "Image",
+    "choose_banner_background",
+    "image_size",
+    "list_images",
+    "pick_banner_background",
+]
 
 IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".bmp", ".gif")
 # Banners are wide strips (256x80, 512x160); backgrounds are 4:3 or 16:9.
@@ -66,7 +72,8 @@ class Image:
         return self.width * self.height
 
 
-def _list_images(directory: str) -> list[Image]:
+def list_images(directory: str) -> list[Image]:
+    """List every readable supported image file in a song directory."""
     if not directory or not Path(directory).is_dir():
         return []
     try:
@@ -110,7 +117,12 @@ def _classify_by_name(name: str, bases: Sequence[str]) -> str | None:
     return None
 
 
-def choose_banner_background(images: Sequence[Image], bases: Sequence[str] = ()) -> tuple[str, str]:
+def choose_banner_background(
+    images: Sequence[Image],
+    bases: Sequence[str] = (),
+    need_banner: bool = True,
+    need_background: bool = True,
+) -> tuple[str, str]:
     """Pick the banner and background out of a song's images.
 
     ``bases`` are name stems to match against, usually the song title and the
@@ -122,18 +134,18 @@ def choose_banner_background(images: Sequence[Image], bases: Sequence[str] = ())
         if any(hint in image.name.lower() for hint in _SKIP_HINTS):
             continue
         kind = _classify_by_name(image.name, bases)
-        if kind == "banner" and not banner:
+        if kind == "banner" and need_banner and not banner:
             banner = image.name
-        elif kind == "background" and not background:
+        elif kind == "background" and need_background and not background:
             background = image.name
         elif kind is None:
             unknown.append(image)
 
-    if not banner:
+    if need_banner and not banner:
         wide = [i for i in unknown if i.ratio >= BANNER_RATIO]
         if wide:
             banner = min(wide, key=lambda i: i.area).name
-    if not background:
+    if need_background and not background:
         rest = [i for i in unknown if i.name != banner and i.ratio < BANNER_RATIO]
         if rest:
             background = max(rest, key=lambda i: (i.area, i.bytes)).name
@@ -142,4 +154,4 @@ def choose_banner_background(images: Sequence[Image], bases: Sequence[str] = ())
 
 def pick_banner_background(directory: str, bases: Sequence[str]) -> tuple[str, str]:
     """Guess the banner and background filenames in a song folder."""
-    return choose_banner_background(_list_images(directory), bases)
+    return choose_banner_background(list_images(directory), bases)

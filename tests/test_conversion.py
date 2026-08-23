@@ -77,6 +77,31 @@ def test_dwi_to_sm_needs_no_disk_access():
     assert "#BANNER:;" in sm
 
 
+def test_conversion_prefers_explicit_images_and_finds_lyrics(tmp_path):
+    (tmp_path / "Song-bg.png").write_bytes(
+        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
+        + (640).to_bytes(4, "big")
+        + (480).to_bytes(4, "big")
+    )
+    (tmp_path / "Song.lrc").write_text("[00:01.00] lyrics")
+    text = "#TITLE:Song;\n#BANNER:custom.png;\n#BPM:120;\n"
+
+    output = dwi_to_sm(text, str(tmp_path), "Song")
+
+    assert "#BANNER:custom.png;" in output
+    assert "#BACKGROUND:Song-bg.png;" in output
+    assert "#LYRICSPATH:Song.lrc;" in output
+
+
+def test_conversion_ignores_text_files_when_finding_lyrics(tmp_path):
+    (tmp_path / "converted.txt").write_text("not lyrics")
+    text = "#TITLE:Song;\n#BPM:120;\n"
+
+    output = dwi_to_sm(text, str(tmp_path), "Song")
+
+    assert "#LYRICSPATH:;" in output
+
+
 def test_convert_file_refuses_to_clobber_by_default(reference_song):
     before = (reference_song / "A.sm").read_bytes()
 

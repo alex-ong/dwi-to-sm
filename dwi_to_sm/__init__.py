@@ -28,7 +28,7 @@ from .folders import (
     test_folder,
     test_tree,
 )
-from .images import Image, choose_banner_background, image_size, pick_banner_background
+from .images import Image, choose_banner_background, image_size, list_images, pick_banner_background
 from .sm import dwi_to_sm
 
 __version__ = "0.1.0"
@@ -52,6 +52,7 @@ __all__ = [
     "find_testable_folders",
     "image_size",
     "is_autoconverted",
+    "list_images",
     "parse_dwi",
     "pick_banner_background",
     "plan_test_tree",
