@@ -45,3 +45,4 @@ Thumbs.db
 /out/
 out.sm
 *.sm.converted
+/.vscode/settings.json

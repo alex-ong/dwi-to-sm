@@ -14,7 +14,10 @@ uv run pyinstaller main.spec %PYINSTALLER_ARGS%
 if errorlevel 1 exit /b %errorlevel%
 
 if %DO_ZIP%==1 (
-    pwsh -NoProfile -Command "$name = 'dist\dwi-to-sm-' + (Get-Date -Format yyyyMMdd-HHmmss) + '.zip'; Compress-Archive -Path 'dist\dwi-to-sm.exe' -DestinationPath $name -Force; Write-Host ('Created ' + $name)"
+    pwsh -NoProfile -Command ^
+        "$name = 'dist\dwi-to-sm-' + (Get-Date -Format yyyyMMdd) + '-win.zip';" ^
+        "Compress-Archive -Path 'dist\dwi-to-sm.exe' -DestinationPath $name -Force;" ^
+        "Write-Host ('Created ' + $name)"
 )
 
 endlocal
