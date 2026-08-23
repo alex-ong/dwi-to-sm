@@ -5,6 +5,9 @@
     convert_file("song/A.dwi")                 # writes song/A.sm
     autoconvert_tree("C:/Songs")               # bulk: only .dwi-only folders
     sm_text = dwi_to_sm(open("A.dwi").read())  # pure string -> string
+
+Copyright (C) 2026 dwi-to-sm contributors.
+Licensed under the GNU General Public License v3 or later; see LICENSE.
 """
 
 from .dwi import DwiChart, DwiError, DwiSong, parse_dwi

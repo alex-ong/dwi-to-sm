@@ -3,6 +3,8 @@ name = "dwi-to-sm"
 version = "0.1.0"
 description = "Convert StepMania DWI simfiles to the SM format."
 readme = "README.md"
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
 requires-python = ">=3.14"
 dependencies = []
 

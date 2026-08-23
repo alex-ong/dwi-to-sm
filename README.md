@@ -83,3 +83,7 @@ Other helpers: `parse_dwi`, `convert_tree`, `scan_folder`,
   is UTF-8 with LF endings.
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) to work on the converter.
+
+## License
+
+[GNU General Public License v3.0 or later](LICENSE).
