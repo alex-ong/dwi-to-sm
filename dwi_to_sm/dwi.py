@@ -2,7 +2,12 @@
 
 The rules here mirror StepMania's own DWI loader, so timing, jumps, holds and
 the 6-panel (solo) character set behave the same way the game does:
-https://github.com/stepmania/stepmania/blob/5_1-new/src/NotesLoaderDWI.cpp
+https://github.com/stepmania/stepmania/blob/5_0/src/NotesLoaderDWI.cpp
+
+Note: the 5_1/5_1-new branches introduced a bug in the jump-note loop that
+silently drops every other note inside a bracket like "<13>" (see
+https://github.com/stepmania/stepmania/issues/2297). This module follows the
+correct 5_0 read-once-per-iteration loop instead.
 """
 
 from __future__ import annotations
