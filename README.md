@@ -87,6 +87,18 @@ For a two-stage test workflow, enumerate `plan_test_tree()` and set each
 `PlannedAction.accepted` to `True` or `False`, then pass the actions to
 `run_planned_actions()`. Only explicitly accepted actions run.
 
+## GUI
+
+Launch the basic asynchronous Tkinter interface with:
+
+```powershell
+uv run python -m dwi_to_sm.gui
+```
+
+It scans the selected library in the background, groups songs as
+`All songs -> pack -> song`, and lets you mark each song for conversion,
+generated-output cleanup, or no action before running the selected work.
+
 ## Notes
 
 - Banner and background are guessed from the images in the song folder, since
