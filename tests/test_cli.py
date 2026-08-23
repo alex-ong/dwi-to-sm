@@ -64,6 +64,18 @@ def test_cli_clear_removes_autoconversions(tmp_path, dwi_only_song):
     assert not (dwi_only_song / "B.sm").exists()
 
 
+def test_cli_clear_test_outputs(tmp_path, reference_song, capsys):
+    output = reference_song / "A.sm.converted"
+    output.write_text("generated")
+
+    assert main([str(tmp_path), "--clear-test-outputs", "--dry-run"]) == 0
+    assert output.exists()
+    assert "DRY" in capsys.readouterr().out
+
+    assert main([str(tmp_path), "--clear-test-outputs"]) == 0
+    assert not output.exists()
+
+
 def test_cli_reports_failure_for_a_bad_file(tmp_path, capsys):
     bad = tmp_path / "bad.dwi"
     bad.write_text("not a simfile")

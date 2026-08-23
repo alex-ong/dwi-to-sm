@@ -14,6 +14,7 @@ from .folders import (
     AUTOCONVERT_MARKER,
     autoconvert_tree,
     clear_autoconversions,
+    clear_test_outputs,
     plan_test_tree,
     test_tree,
 )
@@ -45,6 +46,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help=f"delete .sm files in folders marked by {AUTOCONVERT_MARKER}",
     )
+    parser.add_argument(
+        "--clear-test-outputs",
+        action="store_true",
+        help="delete generated .sm.converted files under the input folders",
+    )
     return parser
 
 
@@ -65,7 +71,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     failures = 0
 
     for target in args.inputs:
-        if args.clear_autoconversions:
+        if args.clear_test_outputs:
+            for path in clear_test_outputs(target, dry_run=True):
+                print(f"{'DRY  ' if args.dry_run else 'DEL  '}{path}")
+            if not args.dry_run:
+                clear_test_outputs(target, dry_run=False)
+        elif args.clear_autoconversions:
             for path in clear_autoconversions(target, dry_run=True):
                 print(f"{'DRY  ' if args.dry_run else 'DEL  '}{path}")
             if not args.dry_run:

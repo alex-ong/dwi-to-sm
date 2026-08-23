@@ -15,6 +15,7 @@ __all__ = [
     "autoconvert_folder",
     "autoconvert_tree",
     "clear_autoconversions",
+    "clear_test_outputs",
     "find_convertible_folders",
     "find_testable_folders",
     "is_autoconverted",
@@ -215,6 +216,17 @@ def clear_autoconversions(root: str, dry_run: bool = True) -> list[str]:
                 with contextlib.suppress(OSError):
                     Path(path).unlink()
     return removed
+
+
+def clear_test_outputs(root: str, dry_run: bool = True) -> list[str]:
+    """List or delete generated ``.sm.converted`` files under ``root``."""
+    targets = [path for path in Path(root).rglob("*.sm.converted") if path.is_file()]
+    paths = [str(path) for path in targets]
+    if not dry_run:
+        for path in targets:
+            with contextlib.suppress(OSError):
+                path.unlink()
+    return paths
 
 
 def _directories(root: str) -> Iterator[Path]:
