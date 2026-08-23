@@ -22,6 +22,8 @@ class App:
         self.nodes: dict[str, TreeNode] = {}
         self.status_bars: dict[str, ttk.Progressbar] = {}
         self.node_iids: dict[int, str] = {}
+        self.node_parents: dict[int, TreeNode | None] = {}
+        self.song_nodes: dict[Path, TreeNode] = {}
         self.tree_root: TreeNode | None = None
         self.status = tk.StringVar(value="Select a song folder to begin.")
         self.total_progress = ttk.Progressbar(root, mode="determinate")
@@ -38,6 +40,7 @@ class App:
         self.choose_button = ttk.Button(toolbar, text="Choose folder", command=self.choose_folder)
         self.choose_button.pack(side="left")
         self.run_button = ttk.Button(toolbar, text="Run", command=self.run_selected)
+        self.run_button.configure(state="disabled")
         self.run_button.pack(side="left", padx=8)
         ttk.Label(toolbar, textvariable=self.status).pack(side="left", padx=8)
 
@@ -112,6 +115,8 @@ class App:
         self.status_bars.clear()
         self.nodes.clear()
         self.node_iids.clear()
+        self.node_parents.clear()
+        self.song_nodes.clear()
         self.tree_root = result.tree
         self.tree.delete(*self.tree.get_children())
         if self.tree_root is not None:
@@ -119,8 +124,11 @@ class App:
         self.root.after_idle(self._place_widgets)
         self.status.set(f"Dry run complete: {len(result.songs)} song folders found.")
         self._set_enabled(True)
+        self._update_run_state()
 
-    def _insert_node(self, parent: str, node: TreeNode) -> None:
+    def _insert_node(
+        self, parent: str, node: TreeNode, parent_node: TreeNode | None = None
+    ) -> None:
         iid = self.tree.insert(
             parent,
             "end",
@@ -130,6 +138,9 @@ class App:
         )
         self.nodes[iid] = node
         self.node_iids[id(node)] = iid
+        self.node_parents[id(node)] = parent_node
+        if node.entry is not None:
+            self.song_nodes[node.entry.folder] = node
         self.status_bars[iid] = ttk.Progressbar(
             self.tree,
             maximum=100,
@@ -138,7 +149,7 @@ class App:
             style=self._conversion_style(node),
         )
         for child in node.children:
-            self._insert_node(iid, child)
+            self._insert_node(iid, child, node)
 
     @staticmethod
     def _action_label(action: Action) -> str:
@@ -159,6 +170,15 @@ class App:
     def _refresh_actions(self) -> None:
         for iid, node in self.nodes.items():
             self.tree.set(iid, "action", self._action_label(node.action))
+        self._update_run_state()
+
+    def _update_run_state(self) -> None:
+        if self.choose_button.instate(["disabled"]):
+            return
+        has_actions = any(
+            node.kind == "song" and node.action != "none" for node in self.nodes.values()
+        )
+        self.run_button.configure(state="normal" if has_actions else "disabled")
 
     @staticmethod
     def _conversion_style(node: TreeNode) -> str:
@@ -173,8 +193,12 @@ class App:
         self.status_bars[iid].configure(
             style=self._conversion_style(node), value=node.progress
         )
-        for child in node.children:
-            self._refresh_progress(child)
+
+    def _refresh_ancestors(self, node: TreeNode) -> None:
+        current: TreeNode | None = node
+        while current is not None:
+            self._refresh_progress(current)
+            current = self.node_parents[id(current)]
 
     def run_selected(self) -> None:
         selected = [
@@ -205,8 +229,8 @@ class App:
                     self._populate(event)
                 elif isinstance(event, Progress):
                     self.total_progress.configure(value=event.completed)
-                    if self.tree_root is not None:
-                        self._refresh_progress(self.tree_root)
+                    node = self.song_nodes[event.folder]
+                    self._refresh_ancestors(node)
                     self.status.set(event.message)
                 elif event == "finished":
                     self.status.set("Run complete.")
@@ -223,6 +247,8 @@ class App:
         state = "normal" if enabled else "disabled"
         self.choose_button.configure(state=state)
         self.run_button.configure(state=state)
+        if enabled:
+            self._update_run_state()
 
 
 def main() -> None:

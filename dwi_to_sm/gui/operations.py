@@ -58,8 +58,13 @@ def operation_count(entries: list[SongEntry]) -> int:
     total = 0
     for entry in entries:
         if entry.action == "convert":
-            total += len(entry.dwi_files)
-            if not entry.autoconverted:
+            pending = [
+                name
+                for name in entry.dwi_files
+                if Path(name).with_suffix(".sm").name not in entry.sm_files
+            ]
+            total += len(pending)
+            if pending and not entry.autoconverted:
                 total += 1
         elif entry.action == "remove":
             total += len(entry.generated_files)
@@ -73,10 +78,16 @@ def execute(entries: list[SongEntry]) -> Iterator[Progress]:
     operations = []
     for entry in entries:
         if entry.action == "convert":
+            pending = [
+                name
+                for name in entry.dwi_files
+                if Path(name).with_suffix(".sm").name not in entry.sm_files
+            ]
             operations.extend(
-                ("convert", entry, entry.folder / name) for name in entry.dwi_files
+                ("convert", entry, entry.folder / name)
+                for name in pending
             )
-            if not entry.autoconverted:
+            if pending and not entry.autoconverted:
                 operations.append(("mark", entry, entry.folder / AUTOCONVERT_MARKER))
         elif entry.action == "remove":
             targets = list(entry.generated_files)
