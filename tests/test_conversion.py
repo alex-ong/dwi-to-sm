@@ -102,6 +102,24 @@ def test_conversion_ignores_text_files_when_finding_lyrics(tmp_path):
     assert "#LYRICSPATH:;" in output
 
 
+def test_conversion_finds_title_matching_music_file(tmp_path):
+    (tmp_path / "Song (Full Mix).mp3").write_bytes(b"audio")
+    text = "#TITLE:Song;\n#BPM:120;\n"
+
+    output = dwi_to_sm(text, str(tmp_path), "Song")
+
+    assert "#MUSIC:Song (Full Mix).mp3;" in output
+
+
+def test_conversion_prefers_explicit_music_tag(tmp_path):
+    (tmp_path / "fallback.ogg").write_bytes(b"audio")
+    text = "#TITLE:Song;\n#FILE:explicit.mp3;\n#BPM:120;\n"
+
+    output = dwi_to_sm(text, str(tmp_path), "Song")
+
+    assert "#MUSIC:explicit.mp3;" in output
+
+
 def test_convert_file_refuses_to_clobber_by_default(reference_song):
     before = (reference_song / "A.sm").read_bytes()
 

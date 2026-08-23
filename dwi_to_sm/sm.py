@@ -102,6 +102,9 @@ def _build_header(song: DwiSong, source_dir: str, base_name: str) -> str:
     lyric_path = song.tag("LYRICSPATH") or song.tag("LYRICS") or _find_lyrics(
         source_dir, (base_name, title)
     )
+    music = song.tag("FILE") or song.tag("MUSIC") or _find_music(
+        source_dir, (base_name, title)
+    )
 
     lines = [
         f"#TITLE:{title};",
@@ -116,7 +119,7 @@ def _build_header(song: DwiSong, source_dir: str, base_name: str) -> str:
         f"#BACKGROUND:{background};",
         f"#LYRICSPATH:{lyric_path};",
         f"#CDTITLE:{song.tag('CDTITLE')};",
-        f"#MUSIC:{song.tag('FILE')};",
+        f"#MUSIC:{music};",
         f"#OFFSET:{_fmt(-gap)};",
     ]
 
@@ -154,6 +157,27 @@ def _find_lyrics(directory: str, bases: Sequence[str]) -> str:
         return ""
     normalized_bases = {Path(base).stem.casefold() for base in bases if base}
     preferred = [path for path in candidates if path.stem.casefold() in normalized_bases]
+    return (preferred or candidates)[0].name
+
+
+def _find_music(directory: str, bases: Sequence[str]) -> str:
+    if not directory or not Path(directory).is_dir():
+        return ""
+    music_extensions = {".aac", ".flac", ".m4a", ".mp3", ".ogg", ".wav", ".wma"}
+    candidates = sorted(
+        path
+        for path in Path(directory).iterdir()
+        if path.is_file() and path.suffix.lower() in music_extensions
+    )
+    if not candidates:
+        return ""
+    normalized_bases = {Path(base).stem.casefold() for base in bases if base}
+    preferred = [
+        path
+        for path in candidates
+        if path.stem.casefold() in normalized_bases
+        or any(base in path.stem.casefold() for base in normalized_bases)
+    ]
     return (preferred or candidates)[0].name
 
 
