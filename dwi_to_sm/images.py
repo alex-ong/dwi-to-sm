@@ -138,7 +138,7 @@ def choose_banner_background(
             banner = image.name
         elif kind == "background" and need_background and not background:
             background = image.name
-        elif kind is None:
+        elif kind is None or (kind == "banner" and need_background):
             unknown.append(image)
 
     if need_banner and not banner:

@@ -138,6 +138,12 @@ def test_explicit_banner_does_not_block_background_selection():
     assert choose_banner_background(images, ("song",), need_banner=False) == ("", "song-bg.png")
 
 
+def test_title_image_can_be_background_after_banner_match():
+    images = [Image("song-bn.png", 418, 164), Image("song.png", 640, 480)]
+
+    assert choose_banner_background(images, ("song",)) == ("song-bn.png", "song.png")
+
+
 def test_list_images_returns_all_readable_supported_images(tmp_path):
     (tmp_path / "banner.png").write_bytes(
         b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR" + (256).to_bytes(4, "big") + (80).to_bytes(4, "big")
