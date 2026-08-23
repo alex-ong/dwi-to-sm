@@ -7,8 +7,13 @@ from collections.abc import Iterator
 from pathlib import Path
 
 from ..files import convert_file
-from ..folders import AUTOCONVERT_MARKER, _simfiles
-from .models import Progress, ScanResult, SongEntry
+from ..folders import (
+    AUTOCONVERT_MARKER,
+    AUTOCONVERT_TEXT,
+    _simfiles,
+    clear_autoconversions,
+)
+from .models import Action, Progress, ScanResult, SongEntry, TreeNode
 
 
 def iter_song_entries(root: Path) -> Iterator[SongEntry]:
@@ -27,7 +32,26 @@ def iter_song_entries(root: Path) -> Iterator[SongEntry]:
 
 
 def scan_library(root: Path) -> ScanResult:
-    return ScanResult(root, list(iter_song_entries(root)))
+    songs = list(iter_song_entries(root))
+    all_songs = TreeNode(root.name or str(root), "all")
+    packs: dict[str, TreeNode] = {}
+    for entry in songs:
+        pack = packs.get(entry.pack)
+        if pack is None:
+            pack = TreeNode(entry.pack, "pack")
+            packs[entry.pack] = pack
+            all_songs.children.append(pack)
+        pack.children.append(TreeNode(entry.folder.name, "song", entry))
+    return ScanResult(root, songs, all_songs)
+
+
+def set_action(node: TreeNode, action: Action) -> None:
+    """Set a node's action and propagate it through all descendants."""
+    node.action = action
+    if node.entry is not None:
+        node.entry.action = action
+    for child in node.children:
+        set_action(child, action)
 
 
 def operation_count(entries: list[SongEntry]) -> int:
@@ -35,10 +59,12 @@ def operation_count(entries: list[SongEntry]) -> int:
     for entry in entries:
         if entry.action == "convert":
             total += len(entry.dwi_files)
+            if not entry.autoconverted:
+                total += 1
         elif entry.action == "remove":
             total += len(entry.generated_files)
             if entry.autoconverted:
-                total += len(entry.sm_files) + 1
+                total += 1
     return total
 
 
@@ -50,12 +76,13 @@ def execute(entries: list[SongEntry]) -> Iterator[Progress]:
             operations.extend(
                 ("convert", entry, entry.folder / name) for name in entry.dwi_files
             )
+            if not entry.autoconverted:
+                operations.append(("mark", entry, entry.folder / AUTOCONVERT_MARKER))
         elif entry.action == "remove":
             targets = list(entry.generated_files)
-            if entry.autoconverted:
-                targets.extend(entry.folder / name for name in entry.sm_files)
-                targets.append(entry.folder / AUTOCONVERT_MARKER)
             operations.extend(("remove", entry, path) for path in targets)
+            if entry.autoconverted:
+                operations.append(("clear", entry, entry.folder))
 
     total = len(operations)
     for completed, (operation, entry, path) in enumerate(operations, 1):
@@ -64,6 +91,16 @@ def execute(entries: list[SongEntry]) -> Iterator[Progress]:
             if path.with_suffix(".sm").name not in entry.sm_files:
                 entry.sm_files.append(path.with_suffix(".sm").name)
             message = f"Converted {path.name}"
+        elif operation == "mark":
+            path.write_text(AUTOCONVERT_TEXT, encoding="utf-8", newline="\n")
+            entry.autoconverted = True
+            message = f"Marked {entry.folder.name} as autoconverted"
+        elif operation == "clear":
+            clear_autoconversions(str(path), dry_run=False)
+            entry.sm_files.clear()
+            entry.generated_files.clear()
+            entry.autoconverted = False
+            message = f"Cleared conversion for {entry.folder.name}"
         else:
             with contextlib.suppress(OSError):
                 path.unlink()

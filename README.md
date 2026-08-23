@@ -83,6 +83,17 @@ Other helpers: `parse_dwi`, `convert_tree`, `scan_folder`,
 `test_folder`, `test_tree`, `plan_test_tree`, `run_planned_actions`,
 `is_autoconverted`, `clear_autoconversions`.
 
+## GUI
+
+Launch the asynchronous Tkinter interface with:
+
+```powershell
+uv run python -m dwi_to_sm.gui
+```
+
+Choose an action on `All songs`, a pack, or an individual song. The choice
+propagates to every lower layer; press `Run` once to execute the marked work.
+
 For a two-stage test workflow, enumerate `plan_test_tree()` and set each
 `PlannedAction.accepted` to `True` or `False`, then pass the actions to
 `run_planned_actions()`. Only explicitly accepted actions run.

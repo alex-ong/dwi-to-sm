@@ -27,9 +27,34 @@ class SongEntry:
 
 
 @dataclass
+class TreeNode:
+    name: str
+    kind: Literal["all", "pack", "song"]
+    entry: SongEntry | None = None
+    children: list[TreeNode] = field(default_factory=list)
+    action: Action = "none"
+
+    @property
+    def progress(self) -> int:
+        if self.entry is not None:
+            return self.entry.progress
+        if not self.children:
+            return 0
+        return round(sum(child.progress for child in self.children) / len(self.children))
+
+    @property
+    def autoconverted(self) -> bool | None:
+        if self.entry is not None:
+            return self.entry.autoconverted
+        statuses = {child.autoconverted for child in self.children}
+        return statuses.pop() if len(statuses) == 1 else None
+
+
+@dataclass
 class ScanResult:
     root: Path
     songs: list[SongEntry] = field(default_factory=list)
+    tree: TreeNode | None = None
 
 
 @dataclass
