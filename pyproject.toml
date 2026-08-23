@@ -36,5 +36,5 @@ select = [
     "RET",  # return style
     "PT",   # pytest style
     "RUF",
+    "PTH",   # pathlib
 ]
-# PTH (prefer pathlib) is deliberately off: this codebase uses os.path throughout.

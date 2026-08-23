@@ -6,8 +6,8 @@ Existing .sm files are never overwritten unless --force is passed.
 from __future__ import annotations
 
 import argparse
-import os
 from collections.abc import Sequence
+from pathlib import Path
 
 from .files import convert_file, convert_tree
 from .folders import AUTOCONVERT_MARKER, autoconvert_tree, clear_autoconversions, test_tree
@@ -65,7 +65,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     failures += _report(folder, None, error)
                 for path in written:
                     failures += _report(folder, path, None)
-        elif not os.path.isdir(target):
+        elif not Path(target).is_dir():
             try:
                 failures += _report(
                     target, convert_file(target, args.out, overwrite=args.force), None

@@ -7,10 +7,10 @@ headers (no image library needed).
 
 from __future__ import annotations
 
-import os
 import struct
 from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
 
 __all__ = ["Image", "choose_banner_background", "image_size", "pick_banner_background"]
 
@@ -23,7 +23,7 @@ _SKIP_HINTS = ("cdtitle", "jacket", "cdimage", "disc")
 def image_size(path: str) -> tuple[int, int] | None:
     """Read width/height straight from the file header."""
     try:
-        with open(path, "rb") as handle:
+        with Path(path).open("rb") as handle:
             head = handle.read(32)
             if head[:8] == b"\x89PNG\r\n\x1a\n" and head[12:16] == b"IHDR":
                 return struct.unpack(">II", head[16:24])
@@ -44,7 +44,7 @@ def image_size(path: str) -> tuple[int, int] | None:
                         body = handle.read(5)
                         height, width = struct.unpack(">HH", body[1:5])
                         return width, height
-                    handle.seek(length - 2, os.SEEK_CUR)
+                    handle.seek(length - 2, 1)
     except OSError, struct.error, IndexError:
         return None
     return None
@@ -67,10 +67,10 @@ class Image:
 
 
 def _list_images(directory: str) -> list[Image]:
-    if not directory or not os.path.isdir(directory):
+    if not directory or not Path(directory).is_dir():
         return []
     try:
-        entries = sorted(os.listdir(directory))
+        entries = sorted(path.name for path in Path(directory).iterdir())
     except OSError:
         return []
 
@@ -78,12 +78,12 @@ def _list_images(directory: str) -> list[Image]:
     for name in entries:
         if not name.lower().endswith(IMAGE_EXTS):
             continue
-        path = os.path.join(directory, name)
+        path = Path(directory) / name
         size = image_size(path)
         if size is None:
             continue
         try:
-            on_disk = os.path.getsize(path)
+            on_disk = path.stat().st_size
         except OSError:
             on_disk = 0
         images.append(Image(name, size[0], size[1], on_disk))
@@ -91,7 +91,7 @@ def _list_images(directory: str) -> list[Image]:
 
 
 def _classify_by_name(name: str, bases: Sequence[str]) -> str | None:
-    stem = os.path.splitext(name)[0].lower()
+    stem = Path(name).stem.lower()
     for base in bases:
         base = base.lower()
         if not base:

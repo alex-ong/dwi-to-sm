@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import contextlib
-import os
+from pathlib import Path
 
 from .files import convert_file
 
@@ -29,7 +29,7 @@ FolderResult = tuple[str, list[str], str | None]
 
 def _simfiles(folder: str) -> tuple[list[str], list[str]]:
     try:
-        entries = sorted(os.listdir(folder))
+        entries = sorted(path.name for path in Path(folder).iterdir())
     except OSError:
         return [], []
     dwi = [e for e in entries if e.lower().endswith(".dwi")]
@@ -45,7 +45,7 @@ def scan_folder(folder: str) -> str | None:
 
 def find_convertible_folders(root: str) -> list[str]:
     """Every folder under ``root`` that has .dwi files but no .sm yet."""
-    return [d for d, _, _ in os.walk(root) if scan_folder(d)]
+    return [str(path) for path in _directories(root) if scan_folder(str(path))]
 
 
 def find_testable_folders(root: str) -> list[str]:
@@ -54,11 +54,15 @@ def find_testable_folders(root: str) -> list[str]:
     Autoconverted folders are excluded: diffing our output against our own
     output proves nothing.
     """
-    return [d for d, _, _ in os.walk(root) if all(_simfiles(d)) and not is_autoconverted(d)]
+    return [
+        str(path)
+        for path in _directories(root)
+        if all(_simfiles(str(path))) and not is_autoconverted(str(path))
+    ]
 
 
 def is_autoconverted(folder: str) -> bool:
-    return os.path.isfile(os.path.join(folder, AUTOCONVERT_MARKER))
+    return (Path(folder) / AUTOCONVERT_MARKER).is_file()
 
 
 def autoconvert_folder(folder: str, overwrite: bool = False) -> list[str]:
@@ -71,12 +75,12 @@ def autoconvert_folder(folder: str, overwrite: bool = False) -> list[str]:
     dwi, _ = _simfiles(folder)
     written = [
         path
-        for path in (convert_file(os.path.join(folder, name), overwrite=overwrite) for name in dwi)
+        for path in (convert_file(str(Path(folder) / name), overwrite=overwrite) for name in dwi)
         if path is not None
     ]
     if written:
-        with open(
-            os.path.join(folder, AUTOCONVERT_MARKER), "w", encoding="utf-8", newline="\n"
+        with (Path(folder) / AUTOCONVERT_MARKER).open(
+            "w", encoding="utf-8", newline="\n"
         ) as handle:
             handle.write(AUTOCONVERT_TEXT)
     return written
@@ -107,8 +111,8 @@ def test_folder(folder: str) -> list[str]:
         return []
     written = []
     for name in dwi:
-        src = os.path.join(folder, name)
-        path = convert_file(src, os.path.splitext(src)[0] + ".sm.converted", overwrite=True)
+        src = str(Path(folder) / name)
+        path = convert_file(src, str(Path(src).with_suffix(".sm.converted")), overwrite=True)
         if path is not None:
             written.append(path)
     return written
@@ -137,15 +141,21 @@ def clear_autoconversions(root: str, dry_run: bool = True) -> list[str]:
     files are never at risk.
     """
     removed: list[str] = []
-    for folder, _, _ in os.walk(root):
+    for folder_path in _directories(root):
+        folder = str(folder_path)
         if not is_autoconverted(folder):
             continue
         _, sm = _simfiles(folder)
-        targets = [os.path.join(folder, n) for n in sm]
-        targets.append(os.path.join(folder, AUTOCONVERT_MARKER))
+        targets = [str(folder_path / n) for n in sm]
+        targets.append(str(folder_path / AUTOCONVERT_MARKER))
         for path in targets:
             removed.append(path)
             if not dry_run:
                 with contextlib.suppress(OSError):
-                    os.remove(path)
+                    Path(path).unlink()
     return removed
+
+
+def _directories(root: str) -> list[Path]:
+    root_path = Path(root)
+    return [root_path, *(path for path in root_path.rglob("*") if path.is_dir())]

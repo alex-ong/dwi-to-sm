@@ -6,9 +6,9 @@ https://github.com/stepmania/stepmania/blob/5_1-new/src/NotesWriterSM.cpp
 
 from __future__ import annotations
 
-import os
 import re
 from collections.abc import Sequence
+from pathlib import Path
 
 from .dwi import ROWS_PER_MEASURE, DwiChart, DwiSong, parse_dwi
 from .images import pick_banner_background
@@ -89,7 +89,7 @@ def _build_header(song: DwiSong, source_dir: str, base_name: str) -> str:
     stops = _convert_pairs(song.tag("FREEZE"), 0.25, 0.001) if song.tag("FREEZE") else []
 
     guessed_banner, guessed_background = pick_banner_background(
-        source_dir, (base_name, title, os.path.basename(source_dir))
+        source_dir, (base_name, title, Path(source_dir).name)
     )
     banner = song.tag("BANNER") or guessed_banner
     background = song.tag("BACKGROUND") or guessed_background
