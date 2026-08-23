@@ -1,8 +1,11 @@
 """The converter must reproduce StepMania's own SM output for the reference song."""
 
 import re
+from pathlib import Path
 
-from dwi_to_sm import convert_file, dwi_to_sm, parse_dwi, read_text
+import pytest
+
+from dwi_to_sm import DwiError, convert_file, convert_tree, dwi_to_sm, parse_dwi, read_text
 
 # StepMania recomputes these on load, so they are not compared.
 RADAR_LINE = re.compile(r"^\s*[\d.]+(,[\d.]+){4}:\s*$")
@@ -128,3 +131,20 @@ def test_convert_file_refuses_to_clobber_by_default(reference_song):
 
     assert convert_file(str(reference_song / "A.dwi"), overwrite=True) is not None
     assert (reference_song / "A.sm").read_bytes() != before
+
+
+def test_convert_file_raises_dwi_error_for_a_bad_file(bad_dwi_song):
+    with pytest.raises(DwiError):
+        convert_file(str(bad_dwi_song / "Bad.dwi"))
+
+
+def test_convert_tree_reports_a_bad_file_without_stopping_the_rest(
+    tmp_path, reference_song, bad_dwi_song
+):
+    results = convert_tree(str(tmp_path))
+
+    by_source = {Path(src).name: (path, error) for src, path, error in results}
+    assert by_source["A.dwi"] == (None, None)  # .sm already exists, skipped
+    assert by_source["Bad.dwi"][0] is None
+    assert "no DWI tags found" in by_source["Bad.dwi"][1]
+    assert not (bad_dwi_song / "Bad.sm").exists()

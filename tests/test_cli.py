@@ -82,3 +82,16 @@ def test_cli_reports_failure_for_a_bad_file(tmp_path, capsys):
 
     assert main([str(bad)]) == 1
     assert "FAIL" in capsys.readouterr().out
+
+
+def test_cli_prints_error_summary_at_the_bottom_without_stopping_the_rest(
+    tmp_path, dwi_only_song, bad_dwi_song, capsys
+):
+    assert main([str(tmp_path)]) == 1
+
+    output = capsys.readouterr().out
+    assert (dwi_only_song / "B.sm").exists()
+    assert not (bad_dwi_song / "Bad.sm").exists()
+    assert f"OK   {dwi_only_song} -> {dwi_only_song / 'B.sm'}" in output
+    assert "1 error(s):" in output
+    assert str(bad_dwi_song) in output.rsplit("1 error(s):", 1)[1]

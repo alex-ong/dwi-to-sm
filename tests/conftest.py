@@ -21,3 +21,12 @@ def dwi_only_song(tmp_path):
     dest.mkdir()
     shutil.copy(DATA / "A" / "A.dwi", dest / "B.dwi")
     return dest
+
+
+@pytest.fixture
+def bad_dwi_song(tmp_path):
+    """A song folder holding only a .dwi that fails to parse."""
+    dest = tmp_path / "Bad"
+    dest.mkdir()
+    (dest / "Bad.dwi").write_text("this is not a valid DWI file at all\n")
+    return dest

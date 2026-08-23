@@ -54,10 +54,13 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _report(source: str, path: str | None, error: str | None) -> bool:
+def _report(
+    source: str, path: str | None, error: str | None, errors: list[tuple[str, str]]
+) -> bool:
     """Print one result line; returns True if it was a failure."""
     if error:
         print(f"FAIL {source}: {error}")
+        errors.append((source, error))
         return True
     if path is None:
         print(f"SKIP {source}: .sm already exists")
@@ -69,6 +72,7 @@ def _report(source: str, path: str | None, error: str | None) -> bool:
 def main(argv: Sequence[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     failures = 0
+    errors: list[tuple[str, str]] = []
 
     for target in args.inputs:
         if args.clear_test_outputs:
@@ -101,12 +105,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             results = test_tree(target)
             for folder, written, error in results:
                 if error:
-                    failures += _report(folder, None, error)
+                    failures += _report(folder, None, error, errors)
                 for path in written:
                     if args.dry_run:
                         print(f"DRY  {folder} -> {path}")
                     else:
-                        failures += _report(folder, path, None)
+                        failures += _report(folder, path, None, errors)
         elif not Path(target).is_dir():
             try:
                 if args.dry_run:
@@ -118,10 +122,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                         print(f"DRY  {target} -> {output}")
                 else:
                     failures += _report(
-                        target, convert_file(target, args.out, overwrite=args.force), None
+                        target, convert_file(target, args.out, overwrite=args.force), None, errors
                     )
             except Exception as exc:
-                failures += _report(target, None, str(exc))
+                failures += _report(target, None, str(exc), errors)
         elif args.out or args.force:
             # An explicit destination (or --force) means whole-tree conversion.
             for src, path, error in convert_tree(
@@ -130,16 +134,22 @@ def main(argv: Sequence[str] | None = None) -> int:
                 if args.dry_run and error is None:
                     print(f"DRY  {src} -> {path}" if path else f"SKIP {src}: .sm already exists")
                 else:
-                    failures += _report(src, path, error)
+                    failures += _report(src, path, error, errors)
         else:
             # Default: only touch song folders that have a .dwi and no .sm at all.
             for folder, written, error in autoconvert_tree(target, dry_run=args.dry_run):
                 if error:
-                    failures += _report(folder, None, error)
+                    failures += _report(folder, None, error, errors)
                 for path in written:
                     if args.dry_run:
                         print(f"DRY  {folder} -> {path}")
                     else:
-                        failures += _report(folder, path, None)
+                        failures += _report(folder, path, None, errors)
+
+    if errors:
+        print()
+        print(f"{len(errors)} error(s):")
+        for source, error in errors:
+            print(f"  {source}: {error}")
 
     return 1 if failures else 0

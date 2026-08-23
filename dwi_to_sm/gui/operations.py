@@ -28,7 +28,9 @@ def iter_song_entries(root: Path) -> Iterator[SongEntry]:
             continue
         relative = current.relative_to(root)
         pack = relative.parts[0] if len(relative.parts) > 1 else "(root)"
-        yield SongEntry(current, pack, dwi, sm, generated, marker.is_file())
+        yield SongEntry(
+            current, pack, dwi, sm, generated, marker.is_file(), already_converted=list(sm)
+        )
 
 
 def scan_library(root: Path) -> ScanResult:
@@ -97,29 +99,42 @@ def execute(entries: list[SongEntry]) -> Iterator[Progress]:
 
     total = len(operations)
     for completed, (operation, entry, path) in enumerate(operations, 1):
-        if operation == "convert":
-            convert_file(str(path), overwrite=False)
-            if path.with_suffix(".sm").name not in entry.sm_files:
-                entry.sm_files.append(path.with_suffix(".sm").name)
-            message = f"Converted {path.name}"
-        elif operation == "mark":
-            path.write_text(AUTOCONVERT_TEXT, encoding="utf-8", newline="\n")
-            entry.autoconverted = True
-            message = f"Marked {entry.folder.name} as autoconverted"
-        elif operation == "clear":
-            clear_autoconversions(str(path), dry_run=False)
-            entry.sm_files.clear()
-            entry.generated_files.clear()
-            entry.autoconverted = False
-            message = f"Cleared conversion for {entry.folder.name}"
-        else:
-            with contextlib.suppress(OSError):
-                path.unlink()
-            if path.name in entry.sm_files:
-                entry.sm_files.remove(path.name)
-            if path in entry.generated_files:
-                entry.generated_files.remove(path)
-            if path.name == AUTOCONVERT_MARKER:
+        error = None
+        try:
+            if operation == "convert":
+                convert_file(str(path), overwrite=False)
+                if path.with_suffix(".sm").name not in entry.sm_files:
+                    entry.sm_files.append(path.with_suffix(".sm").name)
+                message = f"Converted {path.name}"
+            elif operation == "mark":
+                if entry.error is not None:
+                    message = f"Skipped marking {entry.folder.name} (conversion failed)"
+                else:
+                    path.write_text(AUTOCONVERT_TEXT, encoding="utf-8", newline="\n")
+                    entry.autoconverted = True
+                    message = f"Marked {entry.folder.name} as autoconverted"
+            elif operation == "clear":
+                clear_autoconversions(str(path), dry_run=False)
+                entry.sm_files.clear()
+                entry.generated_files.clear()
                 entry.autoconverted = False
-            message = f"Removed {path.name}"
-        yield Progress(completed, total, entry.folder, entry.progress, message)
+                entry.already_converted.clear()
+                entry.failed_files.clear()
+                message = f"Cleared conversion for {entry.folder.name}"
+            else:
+                with contextlib.suppress(OSError):
+                    path.unlink()
+                if path.name in entry.sm_files:
+                    entry.sm_files.remove(path.name)
+                if path in entry.generated_files:
+                    entry.generated_files.remove(path)
+                if path.name == AUTOCONVERT_MARKER:
+                    entry.autoconverted = False
+                message = f"Removed {path.name}"
+        except Exception as exc:  # one bad song must not abort the whole run
+            error = str(exc)
+            entry.error = error
+            if operation == "convert":
+                entry.failed_files.append(path.name)
+            message = f"FAILED {path.name}: {error}"
+        yield Progress(completed, total, entry.folder, entry.progress, message, error)

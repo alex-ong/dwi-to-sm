@@ -69,6 +69,17 @@ def test_autoconvert_tree_reports_each_folder(tmp_path, dwi_only_song, reference
     assert results == [(str(dwi_only_song), [str(dwi_only_song / "B.sm")], None)]
 
 
+def test_autoconvert_tree_isolates_a_bad_folder(tmp_path, dwi_only_song, bad_dwi_song):
+    results = autoconvert_tree(str(tmp_path))
+
+    by_folder = {folder: (written, error) for folder, written, error in results}
+    assert by_folder[str(dwi_only_song)] == ([str(dwi_only_song / "B.sm")], None)
+    assert by_folder[str(bad_dwi_song)][0] == []
+    assert "no DWI tags found" in by_folder[str(bad_dwi_song)][1]
+    assert not (bad_dwi_song / "Bad.sm").exists()
+    assert not is_autoconverted(str(bad_dwi_song))
+
+
 def test_test_folder_writes_alongside_the_original(reference_song):
     before = (reference_song / "A.sm").read_bytes()
     written = test_folder(str(reference_song))

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
+import os
 import queue
 import threading
 import tkinter as tk
@@ -11,7 +13,7 @@ from tkinter import filedialog, messagebox, ttk
 
 from .models import Progress, ScanResult
 from .operations import execute, operation_count, scan_library
-from .widgets import SongTree
+from .widgets import ErrorPane, SongTree
 
 
 class App:
@@ -39,10 +41,25 @@ class App:
             toolbar, text="Expand all folders", command=self._toggle_all_folders
         )
         self.toggle_folders_button.pack(side="left", padx=8)
-        self.run_button = ttk.Button(toolbar, text="Run", command=self.run_selected)
-        self.run_button.configure(state="disabled")
-        self.run_button.pack(side="left")
         ttk.Label(toolbar, textvariable=self.status).pack(side="left", padx=8)
+
+        # A plain tk.Button, not ttk, because Windows' default ttk theme ignores
+        # custom button colors entirely.
+        self.run_button = tk.Button(
+            toolbar,
+            text="Run",
+            command=self.run_selected,
+            background="#1a73e8",
+            foreground="white",
+            activebackground="#1765cc",
+            activeforeground="white",
+            disabledforeground="#dadce0",
+            relief="flat",
+            padx=16,
+            pady=4,
+            state="disabled",
+        )
+        self.run_button.pack(side="right")
 
         self.song_tree = SongTree(self.root)
         self.song_tree.pack(fill="both", expand=True, padx=8, pady=(0, 8))
@@ -52,6 +69,8 @@ class App:
             fill="x", padx=8, pady=8
         )
 
+        self.error_pane = ErrorPane(self.root, on_open_folder=self._open_folder)
+
     def choose_folder(self) -> None:
         selected = filedialog.askdirectory(title="Choose song library")
         if selected:
@@ -59,6 +78,7 @@ class App:
 
     def _choose(self, folder: Path) -> None:
         self.status.set(f"Scanning {folder}...")
+        self.error_pane.clear()
         self._set_enabled(False)
         threading.Thread(target=self._scan_worker, args=(folder,), daemon=True).start()
 
@@ -91,6 +111,7 @@ class App:
         if not selected:
             messagebox.showinfo("Nothing selected", "Choose an action in the tree first.")
             return
+        self.error_pane.clear()
         self._set_enabled(False)
         self.total_progress.configure(value=0, maximum=operation_count(selected))
         threading.Thread(target=self._run_worker, args=(selected,), daemon=True).start()
@@ -113,8 +134,13 @@ class App:
                     self.total_progress.configure(value=event.completed)
                     self.song_tree.refresh_progress(event.folder)
                     self.status.set(event.message)
+                    if event.error is not None:
+                        self.error_pane.add_error(event.folder, event.error)
                 elif event == "finished":
-                    self.status.set("Run complete.")
+                    status = "Run complete."
+                    if self.error_pane.entries:
+                        status += f" {len(self.error_pane.entries)} song(s) failed."
+                    self.status.set(status)
                     self._set_enabled(True)
                 elif isinstance(event, Exception):
                     self.status.set(str(event))
@@ -139,6 +165,10 @@ class App:
         self.song_tree.set_enabled(enabled)
         if enabled:
             self._update_run_state()
+
+    def _open_folder(self, folder: Path) -> None:
+        with contextlib.suppress(OSError):
+            os.startfile(folder)
 
 
 def main() -> None:

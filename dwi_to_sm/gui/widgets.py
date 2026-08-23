@@ -8,8 +8,53 @@ from pathlib import Path
 from tkinter import ttk
 from typing import ClassVar
 
-from .models import Action, ScanResult, TreeNode
+from .models import Action, BarCounts, ErrorEntry, ScanResult, TreeNode
 from .operations import set_action
+
+
+class Tooltip:
+    """Small popup showing text from ``text_provider`` while hovering ``widget``.
+
+    ``text_provider`` receives the triggering mouse event so bars can vary the
+    message depending on which segment is under the cursor.
+    """
+
+    def __init__(self, widget: tk.Widget, text_provider: Callable[[tk.Event], str]):
+        self.widget = widget
+        self.text_provider = text_provider
+        self.tip: tk.Toplevel | None = None
+        self.label: ttk.Label | None = None
+        widget.bind("<Enter>", self._show)
+        widget.bind("<Motion>", self._show)
+        widget.bind("<Leave>", self._hide)
+
+    def _show(self, event: tk.Event) -> None:
+        text = self.text_provider(event)
+        if not text:
+            self._hide(event)
+            return
+        x = self.widget.winfo_rootx() + 20
+        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 5
+        if self.tip is None:
+            self.tip = tk.Toplevel(self.widget)
+            self.tip.wm_overrideredirect(True)
+            self.label = ttk.Label(
+                self.tip,
+                background="#ffffe0",
+                relief="solid",
+                borderwidth=1,
+                padding=4,
+                justify="left",
+            )
+            self.label.pack()
+        self.tip.wm_geometry(f"+{x}+{y}")
+        self.label.configure(text=text)
+
+    def _hide(self, _event: tk.Event) -> None:
+        if self.tip is not None:
+            self.tip.destroy()
+            self.tip = None
+            self.label = None
 
 
 class TriStateButton(ttk.Button):
@@ -45,29 +90,87 @@ class TriStateButton(ttk.Button):
         self.configure(text=self.LABELS[self.node.action], style=self.STYLES[self.node.action])
 
 
-class ConversionProgress(ttk.Progressbar):
-    """Native progress bar showing a node's current conversion percentage."""
+class MultiSegmentBar(tk.Canvas):
+    """Canvas bar showing not-done/no-op/pass/fail counts as proportional segments.
+
+    Drawn on a plain Canvas instead of a ttk.Progressbar because Windows' default
+    ttk theme ignores style colors for progress bars.
+    """
+
+    NOT_DONE = "#e0e0e0"
+    PASS = "#34a853"
+    NO_OP = "#a5d6a7"
+    FAIL = "#d93025"
+
+    def __init__(self, master: tk.Misc, counts_provider: Callable[[], BarCounts]):
+        self.counts_provider = counts_provider
+        super().__init__(master, height=16, highlightthickness=0, background=self.NOT_DONE)
+        self.bind("<Configure>", lambda _event: self._draw())
+        self._draw()
+
+    def _draw(self) -> None:
+        self.delete("segment")
+        counts = self.counts_provider()
+        width, height = self.winfo_width(), self.winfo_height()
+        if width <= 1 or counts.total <= 0:
+            return
+        x = 0
+        for count, color in (
+            (counts.passed, self.PASS),
+            (counts.no_op, self.NO_OP),
+            (counts.failed, self.FAIL),
+        ):
+            if count <= 0:
+                continue
+            segment_width = round(width * count / counts.total)
+            if segment_width > 0:
+                self.create_rectangle(
+                    x, 0, x + segment_width, height, fill=color, width=0, tags="segment"
+                )
+                x += segment_width
+
+    def refresh(self) -> None:
+        self._draw()
+
+
+def segment_tooltip(counts: BarCounts, x: int, width: int) -> str:
+    """Label for whichever colored segment covers pixel ``x`` of a ``width``-wide bar."""
+    if counts.total <= 0 or width <= 0:
+        return ""
+    offset = 0
+    for count, label in (
+        (counts.passed, "Converted"),
+        (counts.no_op, "No conversion required"),
+        (counts.failed, "Conversion attempt failed"),
+    ):
+        segment_width = round(width * count / counts.total)
+        if segment_width and offset <= x < offset + segment_width:
+            return label
+        offset += segment_width
+    return "Not converted yet"
+
+
+def summary_tooltip(counts: BarCounts) -> str:
+    """Breakdown of a folder/root bar's counts, for songs that share it."""
+    return (
+        f"Converted: {counts.passed}\n"
+        f"No conversion required: {counts.no_op}\n"
+        f"Failed: {counts.failed}"
+    )
+
+
+class ConversionProgress(MultiSegmentBar):
+    """MultiSegmentBar bound to a TreeNode's conversion counts."""
 
     def __init__(self, master: tk.Misc, node: TreeNode):
         self.node = node
-        super().__init__(
-            master,
-            maximum=100,
-            mode="determinate",
-            value=node.progress,
-            style=self.style_for(node),
-        )
+        super().__init__(master, counts_provider=lambda: node.counts)
+        Tooltip(self, self._tooltip_text)
 
-    @staticmethod
-    def style_for(node: TreeNode) -> str:
-        return (
-            "ConvertedGreen.Horizontal.TProgressbar"
-            if node.progress == 100
-            else "ConvertedRed.Horizontal.TProgressbar"
-        )
-
-    def refresh(self) -> None:
-        self.configure(value=self.node.progress, style=self.style_for(self.node))
+    def _tooltip_text(self, event: tk.Event) -> str:
+        if self.node.entry is not None:
+            return segment_tooltip(self.node.counts, event.x, self.winfo_width())
+        return summary_tooltip(self.node.counts)
 
 
 class SongTree(ttk.Frame):
@@ -96,8 +199,6 @@ class SongTree(ttk.Frame):
         self.tree.heading("action", text="Action")
         style = ttk.Style(self)
         style.configure("Treeview", rowheight=28)
-        style.configure("ConvertedGreen.Horizontal.TProgressbar", background="#34a853")
-        style.configure("ConvertedRed.Horizontal.TProgressbar", background="#d93025")
         self._configure_action_style(style, "ActionConvert.TButton", "#34a853", "#2d9248")
         self._configure_action_style(style, "ActionRemove.TButton", "#d93025", "#bb2419")
         self._configure_action_style(style, "ActionNone.TButton", "#80868b", "#6f7478")
@@ -181,6 +282,7 @@ class SongTree(ttk.Frame):
         for iid, node in self.nodes.items():
             self.tree.set(iid, "action", TriStateButton.LABELS[node.action])
             self.action_buttons[iid].refresh()
+            self.progress_bars[iid].refresh()
 
     def flash_root_action(self, remaining: int = 11) -> None:
         if self.root_node is None or remaining <= 0:
@@ -243,3 +345,57 @@ class SongTree(ttk.Frame):
             ],
             foreground=[("disabled", "#6b6f6d"), ("!disabled", "black")],
         )
+
+
+class ErrorPane(ttk.Frame):
+    """List of failed songs; each row is the error message plus a '?' button.
+
+    Hidden by default and only packed into ``master`` while there are errors.
+    """
+
+    def __init__(self, master: tk.Misc, on_open_folder: Callable[[Path], None]):
+        super().__init__(master, padding=8)
+        self.on_open_folder = on_open_folder
+        self.entries: list[ErrorEntry] = []
+        self.rows: dict[Path, ttk.Frame] = {}
+        ttk.Label(self, text="Errors").pack(anchor="w")
+        canvas_frame = ttk.Frame(self)
+        canvas_frame.pack(fill="both", expand=True)
+        self.canvas = tk.Canvas(canvas_frame, height=140, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(canvas_frame, orient="vertical", command=self.canvas.yview)
+        self.canvas.configure(yscrollcommand=scrollbar.set)
+        self.canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        self.list_frame = ttk.Frame(self.canvas)
+        self.list_window = self.canvas.create_window((0, 0), window=self.list_frame, anchor="nw")
+        self.list_frame.bind(
+            "<Configure>", lambda _e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        )
+        self.canvas.bind(
+            "<Configure>", lambda e: self.canvas.itemconfigure(self.list_window, width=e.width)
+        )
+
+    def clear(self) -> None:
+        for row in self.rows.values():
+            row.destroy()
+        self.rows.clear()
+        self.entries.clear()
+        self.pack_forget()
+
+    def add_error(self, folder: Path, message: str) -> None:
+        if folder in self.rows:
+            self.rows[folder].destroy()
+            self.entries = [entry for entry in self.entries if entry.folder != folder]
+        self.entries.append(ErrorEntry(folder, message))
+        row = ttk.Frame(self.list_frame)
+        row.pack(fill="x", pady=1)
+        ttk.Label(row, text=f"{folder.name}: {message}", anchor="w").pack(
+            side="left", fill="x", expand=True
+        )
+        ttk.Button(row, text="?", width=2, command=lambda: self.on_open_folder(folder)).pack(
+            side="right"
+        )
+        self.rows[folder] = row
+        if not self.winfo_ismapped():
+            self.pack(fill="both", padx=8, pady=(0, 8))
+
