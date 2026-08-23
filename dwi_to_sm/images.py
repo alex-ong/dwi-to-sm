@@ -12,7 +12,7 @@ import struct
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-__all__ = ["image_size", "pick_banner_background"]
+__all__ = ["Image", "choose_banner_background", "image_size", "pick_banner_background"]
 
 IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".bmp", ".gif")
 # Banners are wide strips (256x80, 512x160); backgrounds are 4:3 or 16:9.
@@ -50,12 +50,12 @@ def image_size(path: str) -> tuple[int, int] | None:
     return None
 
 
-@dataclass
-class _Image:
+@dataclass(frozen=True)
+class Image:
     name: str
     width: int
     height: int
-    bytes: int
+    bytes: int = 0
 
     @property
     def ratio(self) -> float:
@@ -66,7 +66,7 @@ class _Image:
         return self.width * self.height
 
 
-def _list_images(directory: str) -> list[_Image]:
+def _list_images(directory: str) -> list[Image]:
     if not directory or not os.path.isdir(directory):
         return []
     try:
@@ -74,11 +74,9 @@ def _list_images(directory: str) -> list[_Image]:
     except OSError:
         return []
 
-    images: list[_Image] = []
+    images: list[Image] = []
     for name in entries:
         if not name.lower().endswith(IMAGE_EXTS):
-            continue
-        if any(hint in name.lower() for hint in _SKIP_HINTS):
             continue
         path = os.path.join(directory, name)
         size = image_size(path)
@@ -88,7 +86,7 @@ def _list_images(directory: str) -> list[_Image]:
             on_disk = os.path.getsize(path)
         except OSError:
             on_disk = 0
-        images.append(_Image(name, size[0], size[1], on_disk))
+        images.append(Image(name, size[0], size[1], on_disk))
     return images
 
 
@@ -112,11 +110,17 @@ def _classify_by_name(name: str, bases: Sequence[str]) -> str | None:
     return None
 
 
-def pick_banner_background(directory: str, bases: Sequence[str]) -> tuple[str, str]:
-    """Guess the banner and background filenames in a song folder."""
+def choose_banner_background(images: Sequence[Image], bases: Sequence[str] = ()) -> tuple[str, str]:
+    """Pick the banner and background out of a song's images.
+
+    ``bases`` are name stems to match against, usually the song title and the
+    simfile's filename.
+    """
     banner = background = ""
-    unknown: list[_Image] = []
-    for image in _list_images(directory):
+    unknown: list[Image] = []
+    for image in images:
+        if any(hint in image.name.lower() for hint in _SKIP_HINTS):
+            continue
         kind = _classify_by_name(image.name, bases)
         if kind == "banner" and not banner:
             banner = image.name
@@ -134,3 +138,8 @@ def pick_banner_background(directory: str, bases: Sequence[str]) -> tuple[str, s
         if rest:
             background = max(rest, key=lambda i: (i.area, i.bytes)).name
     return banner, background
+
+
+def pick_banner_background(directory: str, bases: Sequence[str]) -> tuple[str, str]:
+    """Guess the banner and background filenames in a song folder."""
+    return choose_banner_background(_list_images(directory), bases)

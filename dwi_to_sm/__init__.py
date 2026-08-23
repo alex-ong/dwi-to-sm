@@ -25,7 +25,7 @@ from .folders import (
     test_folder,
     test_tree,
 )
-from .images import image_size, pick_banner_background
+from .images import Image, choose_banner_background, image_size, pick_banner_background
 from .sm import dwi_to_sm
 
 __version__ = "0.1.0"
@@ -36,8 +36,10 @@ __all__ = [
     "DwiChart",
     "DwiError",
     "DwiSong",
+    "Image",
     "autoconvert_folder",
     "autoconvert_tree",
+    "choose_banner_background",
     "clear_autoconversions",
     "convert_file",
     "convert_tree",
