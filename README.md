@@ -62,10 +62,10 @@ git diff --no-index tests/data/A/A.sm tests/data/A/A.sm.converted
 ```python
 from dwi_to_sm import convert_file, autoconvert_tree, dwi_to_sm
 
-convert_file("A.dwi")                     # -> path, or None if A.sm exists
-convert_file("A.dwi", overwrite=True)     # -> path, clobbers A.sm
-autoconvert_tree("C:/Songs")              # -> [(folder, sm_paths, error), ...]
-dwi_to_sm(open("A.dwi").read())           # -> str, no disk access
+convert_file("A.dwi")  # -> path, or None if A.sm exists
+convert_file("A.dwi", overwrite=True)  # -> path, clobbers A.sm
+autoconvert_tree("C:/Songs")  # -> [(folder, sm_paths, error), ...]
+dwi_to_sm(open("A.dwi").read())  # -> str, no disk access
 ```
 
 Other helpers: `parse_dwi`, `convert_tree`, `scan_folder`,

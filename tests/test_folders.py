@@ -17,8 +17,7 @@ def test_scan_folder_only_returns_dwi_only_folders(dwi_only_song, reference_song
     assert scan_folder(str(dwi_only_song / "missing")) is None
 
 
-def test_find_folders_splits_by_whether_an_sm_exists(tmp_path, dwi_only_song,
-                                                     reference_song):
+def test_find_folders_splits_by_whether_an_sm_exists(tmp_path, dwi_only_song, reference_song):
     assert find_convertible_folders(str(tmp_path)) == [str(dwi_only_song)]
     assert find_testable_folders(str(tmp_path)) == [str(reference_song)]
 
@@ -62,8 +61,7 @@ def test_test_folder_writes_alongside_the_original(reference_song):
     assert (reference_song / "A.sm").read_bytes() == before
 
 
-def test_autoconverted_folders_are_not_worth_diffing(tmp_path, dwi_only_song,
-                                                     reference_song):
+def test_autoconverted_folders_are_not_worth_diffing(tmp_path, dwi_only_song, reference_song):
     autoconvert_folder(str(dwi_only_song))
 
     assert find_testable_folders(str(tmp_path)) == [str(reference_song)]
@@ -75,8 +73,7 @@ def test_clear_only_removes_marked_folders(tmp_path, dwi_only_song, reference_so
     autoconvert_folder(str(dwi_only_song))
 
     dry = clear_autoconversions(str(tmp_path))
-    assert set(dry) == {str(dwi_only_song / "B.sm"),
-                        str(dwi_only_song / "autoconvert.txt")}
+    assert set(dry) == {str(dwi_only_song / "B.sm"), str(dwi_only_song / "autoconvert.txt")}
     assert (dwi_only_song / "B.sm").exists()
 
     clear_autoconversions(str(tmp_path), dry_run=False)

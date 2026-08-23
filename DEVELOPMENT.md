@@ -60,6 +60,25 @@ Keep it that way: a bug in this tool must never be able to destroy someone's
 hand-authored simfiles. `convert_file()` returns `None` rather than writing when
 the target already exists.
 
+## Linting and formatting
+
+[Ruff](https://docs.astral.sh/ruff/) handles both.
+
+```powershell
+uv run ruff check .          # lint
+uv run ruff check . --fix    # lint and apply safe fixes
+uv run ruff format .         # format
+uv run ruff format --check . # verify formatting without writing
+```
+
+Both must be clean before committing. Configuration lives in `pyproject.toml`:
+line length 100, and the rule set covers pycodestyle, pyflakes, import sorting,
+naming, pyupgrade, bugbear, comprehensions, simplification, return style and
+pytest style.
+
+`PTH` (prefer `pathlib`) is deliberately switched off — the codebase uses
+`os.path` consistently, and mixing the two would be worse than either.
+
 ## Tests
 
 ```powershell

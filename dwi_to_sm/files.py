@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import os
-from typing import List, Optional, Tuple
 
 from .sm import dwi_to_sm
 
-__all__ = ["read_text", "convert_file", "convert_tree"]
+__all__ = ["convert_file", "convert_tree", "read_text"]
 
 _ENCODINGS = ("utf-8-sig", "cp932", "cp1252", "latin-1")
 
@@ -24,8 +23,9 @@ def read_text(path: str) -> str:
     return raw.decode("latin-1")
 
 
-def convert_file(dwi_path: str, sm_path: Optional[str] = None,
-                 overwrite: bool = False, encoding: str = "utf-8") -> Optional[str]:
+def convert_file(
+    dwi_path: str, sm_path: str | None = None, overwrite: bool = False, encoding: str = "utf-8"
+) -> str | None:
     """Convert one .dwi file.
 
     Returns the path of the written .sm file, or None if it already existed and
@@ -46,14 +46,15 @@ def convert_file(dwi_path: str, sm_path: Optional[str] = None,
     return sm_path
 
 
-def convert_tree(root: str, out_root: Optional[str] = None,
-                 overwrite: bool = False) -> List[Tuple[str, Optional[str], Optional[str]]]:
+def convert_tree(
+    root: str, out_root: str | None = None, overwrite: bool = False
+) -> list[tuple[str, str | None, str | None]]:
     """Convert every .dwi under ``root``.
 
     Returns ``(dwi_path, sm_path, error)`` per file. ``sm_path`` is None when the
     target already existed and was left alone; ``error`` is None on success.
     """
-    results: List[Tuple[str, Optional[str], Optional[str]]] = []
+    results: list[tuple[str, str | None, str | None]] = []
     for directory, _, files in os.walk(root):
         for name in files:
             if not name.lower().endswith(".dwi"):

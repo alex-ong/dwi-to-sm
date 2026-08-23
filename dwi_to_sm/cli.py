@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import argparse
 import os
-from typing import Optional, Sequence
+from collections.abc import Sequence
 
 from .files import convert_file, convert_tree
 from .folders import AUTOCONVERT_MARKER, autoconvert_tree, clear_autoconversions, test_tree
@@ -18,21 +18,28 @@ __all__ = ["main"]
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="dwi-to-sm",
-        description="Convert DWI simfiles to SM. Existing .sm files are left alone.")
+        description="Convert DWI simfiles to SM. Existing .sm files are left alone.",
+    )
     parser.add_argument("inputs", nargs="+", help=".dwi files or song folders")
-    parser.add_argument("-o", "--out",
-                        help="output file (single .dwi) or output root folder")
-    parser.add_argument("-f", "--force", action="store_true",
-                        help="overwrite existing .sm files (off by default)")
-    parser.add_argument("--test", action="store_true",
-                        help="write <name>.sm.converted beside each hand-made .sm "
-                             "instead of converting, so the two can be diffed")
-    parser.add_argument("--clear-autoconversions", action="store_true",
-                        help=f"delete .sm files in folders marked by {AUTOCONVERT_MARKER}")
+    parser.add_argument("-o", "--out", help="output file (single .dwi) or output root folder")
+    parser.add_argument(
+        "-f", "--force", action="store_true", help="overwrite existing .sm files (off by default)"
+    )
+    parser.add_argument(
+        "--test",
+        action="store_true",
+        help="write <name>.sm.converted beside each hand-made .sm "
+        "instead of converting, so the two can be diffed",
+    )
+    parser.add_argument(
+        "--clear-autoconversions",
+        action="store_true",
+        help=f"delete .sm files in folders marked by {AUTOCONVERT_MARKER}",
+    )
     return parser
 
 
-def _report(source: str, path: Optional[str], error: Optional[str]) -> bool:
+def _report(source: str, path: str | None, error: str | None) -> bool:
     """Print one result line; returns True if it was a failure."""
     if error:
         print(f"FAIL {source}: {error}")
@@ -44,7 +51,7 @@ def _report(source: str, path: Optional[str], error: Optional[str]) -> bool:
     return False
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     failures = 0
 
@@ -61,7 +68,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         elif not os.path.isdir(target):
             try:
                 failures += _report(
-                    target, convert_file(target, args.out, overwrite=args.force), None)
+                    target, convert_file(target, args.out, overwrite=args.force), None
+                )
             except Exception as exc:
                 failures += _report(target, None, str(exc))
         elif args.out or args.force:

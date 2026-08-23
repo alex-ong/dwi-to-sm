@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import os
 import re
-from typing import Dict, List, Sequence
+from collections.abc import Sequence
 
 from .dwi import ROWS_PER_MEASURE, DwiChart, DwiSong, parse_dwi
 from .images import pick_banner_background
@@ -39,9 +39,10 @@ def _parse_timestamp(parts: Sequence[str]) -> float:
     return total
 
 
-def _convert_pairs(raw: str, scale_beat: float, scale_value: float,
-                   value_places: int = 3) -> List[str]:
-    out: List[str] = []
+def _convert_pairs(
+    raw: str, scale_beat: float, scale_value: float, value_places: int = 3
+) -> list[str]:
+    out: list[str] = []
     for chunk in raw.split(","):
         chunk = chunk.strip()
         if "=" not in chunk:
@@ -88,7 +89,8 @@ def _build_header(song: DwiSong, source_dir: str, base_name: str) -> str:
     stops = _convert_pairs(song.tag("FREEZE"), 0.25, 0.001) if song.tag("FREEZE") else []
 
     guessed_banner, guessed_background = pick_banner_background(
-        source_dir, (base_name, title, os.path.basename(source_dir)))
+        source_dir, (base_name, title, os.path.basename(source_dir))
+    )
     banner = song.tag("BANNER") or guessed_banner
     background = song.tag("BACKGROUND") or guessed_background
 
@@ -139,13 +141,13 @@ def _measure_rows(rows: Sequence[int]) -> int:
 
 
 def _chart_body(chart: DwiChart) -> str:
-    by_measure: Dict[int, Dict[int, Dict[int, str]]] = {}
+    by_measure: dict[int, dict[int, dict[int, str]]] = {}
     for (row, col), value in chart.notes.items():
         measure = row // ROWS_PER_MEASURE
         by_measure.setdefault(measure, {}).setdefault(row % ROWS_PER_MEASURE, {})[col] = value
 
     last_measure = max(by_measure) if by_measure else 0
-    measures: List[str] = []
+    measures: list[str] = []
     for measure in range(last_measure + 1):
         rows = by_measure.get(measure, {})
         quant = _measure_rows(sorted(rows)) if rows else 4

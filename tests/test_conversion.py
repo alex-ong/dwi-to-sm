@@ -30,21 +30,34 @@ def parse_sm(text):
 
 def test_note_data_matches_stepmania(reference_song):
     reference = parse_sm((reference_song / "A.sm").read_text(encoding="utf-8"))[1]
-    generated = parse_sm(read_text(convert_file(str(reference_song / "A.dwi"),
-                                                str(reference_song / "out.sm"))))[1]
+    generated = parse_sm(
+        read_text(convert_file(str(reference_song / "A.dwi"), str(reference_song / "out.sm")))
+    )[1]
 
     assert len(generated) == len(reference) == 9
-    for got, want in zip(generated, reference):
+    for got, want in zip(generated, reference, strict=True):
         assert got == want
 
 
 def test_header_matches_stepmania(reference_song):
     want = parse_sm((reference_song / "A.sm").read_text(encoding="utf-8"))[0]
-    got = parse_sm(read_text(convert_file(str(reference_song / "A.dwi"),
-                                          str(reference_song / "out.sm"))))[0]
+    got = parse_sm(
+        read_text(convert_file(str(reference_song / "A.dwi"), str(reference_song / "out.sm")))
+    )[0]
 
-    for tag in ("TITLE", "ARTIST", "MUSIC", "OFFSET", "BPMS", "SAMPLESTART",
-                "SAMPLELENGTH", "DISPLAYBPM", "CDTITLE", "BANNER", "BACKGROUND"):
+    for tag in (
+        "TITLE",
+        "ARTIST",
+        "MUSIC",
+        "OFFSET",
+        "BPMS",
+        "SAMPLESTART",
+        "SAMPLELENGTH",
+        "DISPLAYBPM",
+        "CDTITLE",
+        "BANNER",
+        "BACKGROUND",
+    ):
         assert got[tag] == want[tag], tag
     assert got["STOPS"].strip() == want["STOPS"].strip()
 

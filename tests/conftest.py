@@ -31,7 +31,10 @@ def write_png():
         header = b"IHDR" + struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)
         path.write_bytes(
             b"\x89PNG\r\n\x1a\n"
-            + struct.pack(">I", 13) + header + struct.pack(">I", zlib.crc32(header))
+            + struct.pack(">I", 13)
+            + header
+            + struct.pack(">I", zlib.crc32(header))
         )
         return path
+
     return _write

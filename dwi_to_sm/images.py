@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import os
 import struct
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import List, Optional, Sequence, Tuple
 
 __all__ = ["image_size", "pick_banner_background"]
 
@@ -20,7 +20,7 @@ BANNER_RATIO = 2.0
 _SKIP_HINTS = ("cdtitle", "jacket", "cdimage", "disc")
 
 
-def image_size(path: str) -> Optional[Tuple[int, int]]:
+def image_size(path: str) -> tuple[int, int] | None:
     """Read width/height straight from the file header."""
     try:
         with open(path, "rb") as handle:
@@ -45,7 +45,7 @@ def image_size(path: str) -> Optional[Tuple[int, int]]:
                         height, width = struct.unpack(">HH", body[1:5])
                         return width, height
                     handle.seek(length - 2, os.SEEK_CUR)
-    except (OSError, struct.error, IndexError):
+    except OSError, struct.error, IndexError:
         return None
     return None
 
@@ -66,7 +66,7 @@ class _Image:
         return self.width * self.height
 
 
-def _list_images(directory: str) -> List[_Image]:
+def _list_images(directory: str) -> list[_Image]:
     if not directory or not os.path.isdir(directory):
         return []
     try:
@@ -74,7 +74,7 @@ def _list_images(directory: str) -> List[_Image]:
     except OSError:
         return []
 
-    images: List[_Image] = []
+    images: list[_Image] = []
     for name in entries:
         if not name.lower().endswith(IMAGE_EXTS):
             continue
@@ -92,7 +92,7 @@ def _list_images(directory: str) -> List[_Image]:
     return images
 
 
-def _classify_by_name(name: str, bases: Sequence[str]) -> Optional[str]:
+def _classify_by_name(name: str, bases: Sequence[str]) -> str | None:
     stem = os.path.splitext(name)[0].lower()
     for base in bases:
         base = base.lower()
@@ -100,7 +100,7 @@ def _classify_by_name(name: str, bases: Sequence[str]) -> Optional[str]:
             continue
         if stem == base:
             return "banner"
-        suffix = stem[len(base):].strip(" -_") if stem.startswith(base) else ""
+        suffix = stem[len(base) :].strip(" -_") if stem.startswith(base) else ""
         if suffix in ("bg", "background"):
             return "background"
         if suffix in ("bn", "banner"):
@@ -112,10 +112,10 @@ def _classify_by_name(name: str, bases: Sequence[str]) -> Optional[str]:
     return None
 
 
-def pick_banner_background(directory: str, bases: Sequence[str]) -> Tuple[str, str]:
+def pick_banner_background(directory: str, bases: Sequence[str]) -> tuple[str, str]:
     """Guess the banner and background filenames in a song folder."""
     banner = background = ""
-    unknown: List[_Image] = []
+    unknown: list[_Image] = []
     for image in _list_images(directory):
         kind = _classify_by_name(image.name, bases)
         if kind == "banner" and not banner:

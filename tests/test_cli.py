@@ -24,8 +24,7 @@ def test_cli_force_allows_overwriting(reference_song):
     assert (reference_song / "A.sm").read_bytes() != before
 
 
-def test_cli_folder_run_leaves_folders_with_an_sm_alone(tmp_path, dwi_only_song,
-                                                        reference_song):
+def test_cli_folder_run_leaves_folders_with_an_sm_alone(tmp_path, dwi_only_song, reference_song):
     before = (reference_song / "A.sm").read_bytes()
 
     assert main([str(tmp_path)]) == 0

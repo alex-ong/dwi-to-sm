@@ -8,18 +8,18 @@ https://github.com/stepmania/stepmania/blob/5_1-new/src/NotesLoaderDWI.cpp
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from fractions import Fraction
-from typing import Dict, List, Optional, Sequence, Tuple
 
 __all__ = [
-    "ROWS_PER_BEAT",
-    "ROWS_PER_MEASURE",
+    "DIFFICULTIES",
     "DWI_CHARS",
     "MODES",
-    "DIFFICULTIES",
-    "DwiError",
+    "ROWS_PER_BEAT",
+    "ROWS_PER_MEASURE",
     "DwiChart",
+    "DwiError",
     "DwiSong",
     "parse_dwi",
 ]
@@ -32,7 +32,7 @@ ROWS_PER_MEASURE = ROWS_PER_BEAT * 4
 L, D, U, R, UL, UR = "L", "D", "U", "R", "UL", "UR"
 
 # Mirrors DWIcharToNote() in NotesLoaderDWI.cpp.
-DWI_CHARS: Dict[str, Tuple[str, ...]] = {
+DWI_CHARS: dict[str, tuple[str, ...]] = {
     "0": (),
     "1": (D, L),
     "2": (D,),
@@ -62,7 +62,7 @@ DWI_CHARS: Dict[str, Tuple[str, ...]] = {
 _SINGLE_COLS = {L: 0, D: 1, U: 2, R: 3}
 _SOLO_COLS = {L: 0, UL: 1, D: 2, U: 3, UR: 4, R: 5}
 
-MODES: Dict[str, Tuple[str, Dict[str, int], int, int]] = {
+MODES: dict[str, tuple[str, dict[str, int], int, int]] = {
     # dwi tag: (sm steps type, panel->column map, tracks per pad, pads)
     "SINGLE": ("dance-single", _SINGLE_COLS, 4, 1),
     "DOUBLE": ("dance-double", _SINGLE_COLS, 4, 2),
@@ -71,7 +71,7 @@ MODES: Dict[str, Tuple[str, Dict[str, int], int, int]] = {
 }
 
 # Mirrors DwiCompatibleStringToDifficulty() in NotesLoaderDWI.cpp.
-DIFFICULTIES: Dict[str, str] = {
+DIFFICULTIES: dict[str, str] = {
     "BEGINNER": "Beginner",
     "EASY": "Easy",
     "BASIC": "Easy",
@@ -94,10 +94,10 @@ DIFFICULTIES: Dict[str, str] = {
 
 # Step-length (in beats) opened by each bracket character.
 _OPENERS = {
-    "(": Fraction(1, 4),    # 1/16 notes
-    "[": Fraction(1, 6),    # 1/24 notes
-    "{": Fraction(1, 16),   # 1/64 notes
-    "`": Fraction(1, 48),   # 1/192 notes
+    "(": Fraction(1, 4),  # 1/16 notes
+    "[": Fraction(1, 6),  # 1/24 notes
+    "{": Fraction(1, 16),  # 1/64 notes
+    "`": Fraction(1, 48),  # 1/192 notes
 }
 _CLOSERS = ")]}'>"
 _DEFAULT_STEP = Fraction(1, 2)  # 1/8 notes
@@ -115,20 +115,20 @@ class DwiChart:
     meter: int
     num_tracks: int
     # (row, column) -> "1" tap / "2" hold head / "3" hold tail
-    notes: Dict[Tuple[int, int], str] = field(default_factory=dict)
+    notes: dict[tuple[int, int], str] = field(default_factory=dict)
 
 
 @dataclass
 class DwiSong:
-    tags: Dict[str, List[str]] = field(default_factory=dict)
-    charts: List[DwiChart] = field(default_factory=list)
+    tags: dict[str, list[str]] = field(default_factory=dict)
+    charts: list[DwiChart] = field(default_factory=list)
 
     def tag(self, name: str, default: str = "") -> str:
         """Full raw value of a tag (parameters rejoined with ':')."""
         params = self.tags.get(name)
         return ":".join(params) if params else default
 
-    def params(self, name: str) -> List[str]:
+    def params(self, name: str) -> list[str]:
         return list(self.tags.get(name, []))
 
 
@@ -137,22 +137,22 @@ def _strip_comments(text: str) -> str:
     return re.sub(r"(?<!:)//[^\n]*", "", text)
 
 
-def _parse_msd(text: str) -> List[List[str]]:
+def _parse_msd(text: str) -> list[list[str]]:
     """Split a MSD-style file into ``[tag, param, param, ...]`` lists.
 
     See MsdFile.cpp:
     https://github.com/stepmania/stepmania/blob/5_1-new/src/MsdFile.cpp
     """
     text = _strip_comments(text)
-    values: List[List[str]] = []
+    values: list[list[str]] = []
     i, n = 0, len(text)
     while i < n:
         if text[i] != "#":
             i += 1
             continue
         i += 1
-        params: List[str] = []
-        buf: List[str] = []
+        params: list[str] = []
+        buf: list[str] = []
         while i < n:
             c = text[i]
             if c == ";":
@@ -186,15 +186,16 @@ def _is_192(data: str, pos: int) -> bool:
     return False
 
 
-def _columns(char: str, colmap: Dict[str, int], offset: int) -> List[int]:
+def _columns(char: str, colmap: dict[str, int], offset: int) -> list[int]:
     panels = DWI_CHARS.get(char.upper())
     if panels is None:
         return []
     return [colmap[p] + offset for p in panels if p in colmap]
 
 
-def _parse_step_data(data: str, colmap: Dict[str, int], offset: int,
-                     notes: Dict[Tuple[int, int], str]) -> None:
+def _parse_step_data(
+    data: str, colmap: dict[str, int], offset: int, notes: dict[tuple[int, int], str]
+) -> None:
     data = re.sub(r"\s", "", data)
     beat = Fraction(0)
     step = _DEFAULT_STEP
@@ -246,7 +247,7 @@ def _parse_step_data(data: str, colmap: Dict[str, int], offset: int,
         beat += step
 
 
-def _resolve_holds(notes: Dict[Tuple[int, int], str], num_tracks: int) -> None:
+def _resolve_holds(notes: dict[tuple[int, int], str], num_tracks: int) -> None:
     """A DWI hold ends at the next note in the same column; that note is eaten."""
     for col in range(num_tracks):
         rows = sorted(r for (r, c) in notes if c == col)
@@ -264,7 +265,7 @@ def _resolve_holds(notes: Dict[Tuple[int, int], str], num_tracks: int) -> None:
                 idx += 1
 
 
-def _parse_chart(params: Sequence[str]) -> Optional[DwiChart]:
+def _parse_chart(params: Sequence[str]) -> DwiChart | None:
     mode = params[0].upper()
     steps_type, colmap, tracks_per_pad, pads = MODES[mode]
     if len(params) < 4:
@@ -277,7 +278,7 @@ def _parse_chart(params: Sequence[str]) -> Optional[DwiChart]:
         meter = 1
 
     num_tracks = tracks_per_pad * pads
-    notes: Dict[Tuple[int, int], str] = {}
+    notes: dict[tuple[int, int], str] = {}
     for pad in range(pads):
         index = 3 + pad
         if index >= len(params) or not params[index].strip():
