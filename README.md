@@ -2,16 +2,17 @@
 
 Convert StepMania **DWI** simfiles to the **SM** format.
 
-Parsing follows StepMania's own loader,
+Parsing follows StepMania's own loader from version `5_0`,
 [NotesLoaderDWI.cpp](https://github.com/stepmania/stepmania/blob/5_0/src/NotesLoaderDWI.cpp)
-(the 5_1/5_1-new branches have a jump-note parsing bug, see
-[stepmania#2297](https://github.com/stepmania/stepmania/issues/2297)),
 and output follows
 [NotesWriterSM.cpp](https://github.com/stepmania/stepmania/blob/5_1-new/src/NotesWriterSM.cpp),
 so note data round-trips exactly against StepMania's own output.
 
 > [!NOTE]
-> Folders with both sm and dwi will be ignored
+> Folders with both sm and dwi will be ignored.
+> 
+> The `5_0` DWI loader is the reference, since `5_1` have a jump-note parsing bug, see
+[stepmania#2297](https://github.com/stepmania/stepmania/issues/2297)),
 
 
 ## Running in windows
