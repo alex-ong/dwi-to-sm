@@ -57,6 +57,16 @@ uv run python -m dwi_to_sm tests/data --test
 git diff --no-index tests/data/A/A.sm tests/data/A/A.sm.converted
 ```
 
+Preview that comparison without writing the converted files:
+
+```powershell
+uv run python -m dwi_to_sm "S:/games/deadsync/songs" --test --dry-run
+```
+
+This prints how many song folders contain both `.dwi` and `.sm` files without
+creating the comparison files. Autoconverted folders are excluded. The full
+enumerable plan is also available to callers through `plan_test_tree()`.
+
 ## Library
 
 ```python
@@ -70,7 +80,12 @@ dwi_to_sm(open("A.dwi").read())  # -> str, no disk access
 
 Other helpers: `parse_dwi`, `convert_tree`, `scan_folder`,
 `find_convertible_folders`, `find_testable_folders`, `autoconvert_folder`,
-`test_folder`, `test_tree`, `is_autoconverted`, `clear_autoconversions`.
+`test_folder`, `test_tree`, `plan_test_tree`, `run_planned_actions`,
+`is_autoconverted`, `clear_autoconversions`.
+
+For a two-stage test workflow, enumerate `plan_test_tree()` and set each
+`PlannedAction.accepted` to `True` or `False`, then pass the actions to
+`run_planned_actions()`. Only explicitly accepted actions run.
 
 ## Notes
 

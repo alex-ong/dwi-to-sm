@@ -39,6 +39,16 @@ def test_cli_test_mode_writes_converted_files(tmp_path, reference_song):
     assert (reference_song / "A.sm.converted").exists()
 
 
+def test_cli_dry_run_test_mode_reports_songs_without_writing(tmp_path, reference_song, capsys):
+    assert main([str(tmp_path), "--test", "--dry-run"]) == 0
+
+    output = capsys.readouterr().out
+    assert "1 song(s) have both .dwi and .sm files" in output
+    assert "1 .dwi file(s) would be compared" in output
+    assert str(reference_song) not in output
+    assert not (reference_song / "A.sm.converted").exists()
+
+
 def test_cli_test_mode_ignores_autoconverted_folders(tmp_path, dwi_only_song):
     main([str(tmp_path)])
 

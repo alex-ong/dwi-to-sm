@@ -10,7 +10,13 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from .files import convert_file, convert_tree
-from .folders import AUTOCONVERT_MARKER, autoconvert_tree, clear_autoconversions, test_tree
+from .folders import (
+    AUTOCONVERT_MARKER,
+    autoconvert_tree,
+    clear_autoconversions,
+    plan_test_tree,
+    test_tree,
+)
 
 __all__ = ["main"]
 
@@ -30,6 +36,9 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="write <name>.sm.converted beside each hand-made .sm "
         "instead of converting, so the two can be diffed",
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="print planned actions without changing files"
     )
     parser.add_argument(
         "--clear-autoconversions",
@@ -57,31 +66,59 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     for target in args.inputs:
         if args.clear_autoconversions:
-            for path in clear_autoconversions(target, dry_run=False):
-                print(f"DEL  {path}")
+            for path in clear_autoconversions(target, dry_run=True):
+                print(f"{'DRY  ' if args.dry_run else 'DEL  '}{path}")
+            if not args.dry_run:
+                clear_autoconversions(target, dry_run=False)
         elif args.test:
-            for folder, written, error in test_tree(target):
+            if args.dry_run:
+                plans = plan_test_tree(target)
+                folders = {Path(action.source).parent for action in plans}
+                print(f"DRY  {len(folders)} song(s) have both .dwi and .sm files")
+                print(f"DRY  {len(plans)} .dwi file(s) would be compared")
+                continue
+            results = test_tree(target)
+            for folder, written, error in results:
                 if error:
                     failures += _report(folder, None, error)
                 for path in written:
-                    failures += _report(folder, path, None)
+                    if args.dry_run:
+                        print(f"DRY  {folder} -> {path}")
+                    else:
+                        failures += _report(folder, path, None)
         elif not Path(target).is_dir():
             try:
-                failures += _report(
-                    target, convert_file(target, args.out, overwrite=args.force), None
-                )
+                if args.dry_run:
+                    source = Path(target).absolute()
+                    output = Path(args.out) if args.out else source.with_suffix(".sm")
+                    if output.exists() and not args.force:
+                        print(f"SKIP {target}: .sm already exists")
+                    else:
+                        print(f"DRY  {target} -> {output}")
+                else:
+                    failures += _report(
+                        target, convert_file(target, args.out, overwrite=args.force), None
+                    )
             except Exception as exc:
                 failures += _report(target, None, str(exc))
         elif args.out or args.force:
             # An explicit destination (or --force) means whole-tree conversion.
-            for src, path, error in convert_tree(target, args.out, overwrite=args.force):
-                failures += _report(src, path, error)
+            for src, path, error in convert_tree(
+                target, args.out, overwrite=args.force, dry_run=args.dry_run
+            ):
+                if args.dry_run and error is None:
+                    print(f"DRY  {src} -> {path}" if path else f"SKIP {src}: .sm already exists")
+                else:
+                    failures += _report(src, path, error)
         else:
             # Default: only touch song folders that have a .dwi and no .sm at all.
-            for folder, written, error in autoconvert_tree(target):
+            for folder, written, error in autoconvert_tree(target, dry_run=args.dry_run):
                 if error:
                     failures += _report(folder, None, error)
                 for path in written:
-                    failures += _report(folder, path, None)
+                    if args.dry_run:
+                        print(f"DRY  {folder} -> {path}")
+                    else:
+                        failures += _report(folder, path, None)
 
     return 1 if failures else 0

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import contextlib
+from collections.abc import Iterable, Iterator
+from dataclasses import dataclass
 from pathlib import Path
 
 from .files import convert_file
@@ -16,6 +18,8 @@ __all__ = [
     "find_convertible_folders",
     "find_testable_folders",
     "is_autoconverted",
+    "plan_test_tree",
+    "run_planned_actions",
     "scan_folder",
     "test_folder",
     "test_tree",
@@ -25,6 +29,16 @@ AUTOCONVERT_MARKER = "autoconvert.txt"
 AUTOCONVERT_TEXT = "was autoconverted by dwi-to-sm\n"
 
 FolderResult = tuple[str, list[str], str | None]
+
+
+@dataclass
+class PlannedAction:
+    """A proposed filesystem operation awaiting an explicit decision."""
+
+    operation: str
+    source: str
+    destination: str
+    accepted: bool | None = None
 
 
 def _simfiles(folder: str) -> tuple[list[str], list[str]]:
@@ -61,11 +75,39 @@ def find_testable_folders(root: str) -> list[str]:
     ]
 
 
+def plan_test_tree(root: str) -> list[PlannedAction]:
+    """Return proposed test conversions without writing files."""
+    plans = []
+    for folder in find_testable_folders(root):
+        dwi, _ = _simfiles(folder)
+        plans.extend(
+            PlannedAction(
+                "test",
+                str(Path(folder) / name),
+                str((Path(folder) / name).with_suffix(".sm.converted")),
+            )
+            for name in dwi
+        )
+    return plans
+
+
+def run_planned_actions(actions: Iterable[PlannedAction]) -> list[str]:
+    """Run accepted actions; rejected or undecided actions are skipped."""
+    written = []
+    for action in actions:
+        if action.operation != "test" or action.accepted is not True:
+            continue
+        path = convert_file(action.source, action.destination, overwrite=True)
+        if path is not None:
+            written.append(path)
+    return written
+
+
 def is_autoconverted(folder: str) -> bool:
     return (Path(folder) / AUTOCONVERT_MARKER).is_file()
 
 
-def autoconvert_folder(folder: str, overwrite: bool = False) -> list[str]:
+def autoconvert_folder(folder: str, overwrite: bool = False, dry_run: bool = False) -> list[str]:
     """Convert a .dwi-only folder in place and leave the autoconvert marker.
 
     Returns the written .sm paths; empty if the folder already has an .sm.
@@ -73,20 +115,27 @@ def autoconvert_folder(folder: str, overwrite: bool = False) -> list[str]:
     if scan_folder(folder) is None:
         return []
     dwi, _ = _simfiles(folder)
-    written = [
+    planned = [
         path
-        for path in (convert_file(str(Path(folder) / name), overwrite=overwrite) for name in dwi)
+        for path in (
+            str(Path(folder) / name).replace(Path(name).suffix, ".sm")
+            if dry_run
+            else convert_file(str(Path(folder) / name), overwrite=overwrite)
+            for name in dwi
+        )
         if path is not None
     ]
-    if written:
+    if planned and not dry_run:
         with (Path(folder) / AUTOCONVERT_MARKER).open(
             "w", encoding="utf-8", newline="\n"
         ) as handle:
             handle.write(AUTOCONVERT_TEXT)
-    return written
+    return planned
 
 
-def autoconvert_tree(root: str, overwrite: bool = False) -> list[FolderResult]:
+def autoconvert_tree(
+    root: str, overwrite: bool = False, dry_run: bool = False
+) -> list[FolderResult]:
     """Autoconvert every .dwi-only folder under ``root``.
 
     Returns ``(folder, sm_paths, error)`` per folder; ``error`` is None on success.
@@ -94,13 +143,13 @@ def autoconvert_tree(root: str, overwrite: bool = False) -> list[FolderResult]:
     results: list[FolderResult] = []
     for folder in find_convertible_folders(root):
         try:
-            results.append((folder, autoconvert_folder(folder, overwrite), None))
+            results.append((folder, autoconvert_folder(folder, overwrite, dry_run), None))
         except Exception as exc:
             results.append((folder, [], str(exc)))
     return results
 
 
-def test_folder(folder: str) -> list[str]:
+def test_folder(folder: str, dry_run: bool = False) -> list[str]:  # noqa: PT028
     """Convert a folder that already has an .sm, writing ``<name>.sm.converted``.
 
     The real .sm is never touched, so the two can be diffed. Folders we
@@ -112,18 +161,30 @@ def test_folder(folder: str) -> list[str]:
     written = []
     for name in dwi:
         src = str(Path(folder) / name)
-        path = convert_file(src, str(Path(src).with_suffix(".sm.converted")), overwrite=True)
+        path = (
+            str(Path(src).with_suffix(".sm.converted"))
+            if dry_run
+            else convert_file(src, str(Path(src).with_suffix(".sm.converted")), overwrite=True)
+        )
         if path is not None:
             written.append(path)
     return written
 
 
-def test_tree(root: str) -> list[FolderResult]:
+def test_tree(root: str, dry_run: bool = False) -> list[FolderResult]:  # noqa: PT028
     """Write ``<name>.sm.converted`` beside every hand-made .sm under ``root``."""
     results: list[FolderResult] = []
+    actions = plan_test_tree(root)
     for folder in find_testable_folders(root):
+        folder_actions = [action for action in actions if str(Path(action.source).parent) == folder]
         try:
-            results.append((folder, test_folder(folder), None))
+            if dry_run:
+                paths = [action.destination for action in folder_actions]
+            else:
+                for action in folder_actions:
+                    action.accepted = True
+                paths = run_planned_actions(iter(folder_actions))
+            results.append((folder, paths, None))
         except Exception as exc:
             results.append((folder, [], str(exc)))
     return results
@@ -156,6 +217,6 @@ def clear_autoconversions(root: str, dry_run: bool = True) -> list[str]:
     return removed
 
 
-def _directories(root: str) -> list[Path]:
+def _directories(root: str) -> Iterator[Path]:
     root_path = Path(root)
-    return [root_path, *(path for path in root_path.rglob("*") if path.is_dir())]
+    yield from (current for current, _, _ in root_path.walk())

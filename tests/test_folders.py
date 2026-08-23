@@ -6,6 +6,8 @@ from dwi_to_sm import (
     find_convertible_folders,
     find_testable_folders,
     is_autoconverted,
+    plan_test_tree,
+    run_planned_actions,
     scan_folder,
     test_folder,
 )
@@ -20,6 +22,20 @@ def test_scan_folder_only_returns_dwi_only_folders(dwi_only_song, reference_song
 def test_find_folders_splits_by_whether_an_sm_exists(tmp_path, dwi_only_song, reference_song):
     assert find_convertible_folders(str(tmp_path)) == [str(dwi_only_song)]
     assert find_testable_folders(str(tmp_path)) == [str(reference_song)]
+
+
+def test_plan_test_tree_returns_enumerable_comparisons(tmp_path, reference_song):
+    plans = plan_test_tree(str(tmp_path))
+
+    assert len(plans) == 1
+    assert plans[0].operation == "test"
+    assert plans[0].source == str(reference_song / "A.dwi")
+    assert plans[0].destination == str(reference_song / "A.sm.converted")
+    assert plans[0].accepted is None
+
+    assert run_planned_actions(iter(plans)) == []
+    plans[0].accepted = True
+    assert run_planned_actions(iter(plans)) == [str(reference_song / "A.sm.converted")]
 
 
 def test_autoconvert_writes_sm_and_marker(dwi_only_song):

@@ -53,12 +53,19 @@ distribution is wanted later, add a build backend and move the package into
 ```powershell
 uv run python -m dwi_to_sm tests/data/A/A.dwi -o out.sm
 uv run python -m dwi_to_sm --help
+uv run python -m dwi_to_sm tests/data --test --dry-run
 ```
 
 The converter never overwrites an existing `.sm` unless `--force` is passed.
 Keep it that way: a bug in this tool must never be able to destroy someone's
 hand-authored simfiles. `convert_file()` returns `None` rather than writing when
 the target already exists.
+
+`--dry-run` prints planned actions without writing files. Combined with
+`--test`, it reports song folders containing both `.dwi` and `.sm` files and
+prints their count. Library and UI code can use `plan_test_tree()` to get
+`PlannedAction` objects, approve or reject them, and pass the accepted plan to
+`run_planned_actions()`.
 
 ## Linting and formatting
 

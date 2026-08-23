@@ -47,7 +47,7 @@ def convert_file(
 
 
 def convert_tree(
-    root: str, out_root: str | None = None, overwrite: bool = False
+    root: str, out_root: str | None = None, overwrite: bool = False, dry_run: bool = False
 ) -> list[tuple[str, str | None, str | None]]:
     """Convert every .dwi under ``root``.
 
@@ -64,8 +64,15 @@ def convert_tree(
         if out_root is not None:
             relative_directory = source_path.parent.relative_to(root_path)
             dst = str(Path(out_root, relative_directory, source_path.with_suffix(".sm").name))
+        elif dry_run:
+            dst = str(source_path.with_suffix(".sm"))
         try:
-            results.append((src, convert_file(src, dst, overwrite=overwrite), None))
+            if dry_run:
+                target_path = Path(dst) if dst is not None else source_path.with_suffix(".sm")
+                path = None if target_path.exists() and not overwrite else str(target_path)
+            else:
+                path = convert_file(src, dst, overwrite=overwrite)
+            results.append((src, path, None))
         except Exception as exc:  # keep going through a bulk run
             results.append((src, None, str(exc)))
     return results
