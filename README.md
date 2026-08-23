@@ -8,107 +8,38 @@ and output follows
 [NotesWriterSM.cpp](https://github.com/stepmania/stepmania/blob/5_1-new/src/NotesWriterSM.cpp),
 so note data round-trips exactly against StepMania's own output.
 
-**Existing `.sm` files are never overwritten** unless you pass `--force`.
+> [!NOTE]
+> Folders with both sm and dwi will be ignored
+
+
+## Running in windows
+A precompiled binary is available in [releases](https://github.com/alex-ong/dwi-to-sm/releases) page.
+Here is an example of converting 500~ files, with error handling:
+
+https://github.com/user-attachments/assets/4ddae324-ecd5-4254-9689-10cf4674c265
+
+You can also remove converted files, since we create a metadata file marking the conversion.
+
+https://github.com/user-attachments/assets/5bfbe9be-8fd5-488b-99e3-4a2b21b6336c
+
+## Running in Other OS's
+Setup the repo then run it. For some OS's you might have to install `tkinter`
 
 ## Setup
 
 Needs [uv](https://docs.astral.sh/uv/) and Python 3.14.
 
-```powershell
+```bash
 uv sync
 ```
 
 ## Usage
 
-```powershell
-# a song library: converts only folders that have a .dwi and no .sm
-uv run python -m dwi_to_sm "C:/Songs"
-
-# a single file -> A.sm beside it
-uv run python -m dwi_to_sm "C:/Songs/A/A.dwi"
-
-# write somewhere else instead
-uv run python -m dwi_to_sm "C:/Songs" -o "C:/Converted"
-```
-
-Each result prints `OK`, `SKIP` or `FAIL`; the exit code is non-zero if anything
-failed.
-
-Converted folders get an `autoconvert.txt` marker, which makes two things
-possible:
-
-```powershell
-# re-run any time; only new songs are converted
-uv run python -m dwi_to_sm "C:/Songs"
-
-# found a bug? throw away only what this tool made, then convert again
-uv run python -m dwi_to_sm "C:/Songs" --clear-autoconversions
-uv run python -m dwi_to_sm "C:/Songs"
-```
-
-`--clear-autoconversions` only deletes `.sm` files in marked folders, so
-hand-made simfiles are never at risk.
-
-To check the converter against songs that already have a hand-made `.sm`,
-`--test` writes `<name>.sm.converted` beside them without touching anything:
-
-```powershell
-uv run python -m dwi_to_sm tests/data --test
-git diff --no-index tests/data/A/A.sm tests/data/A/A.sm.converted
-```
-
-Preview that comparison without writing the converted files:
-
-```powershell
-uv run python -m dwi_to_sm "S:/games/deadsync/songs" --test --dry-run
-```
-
-This prints how many song folders contain both `.dwi` and `.sm` files without
-creating the comparison files. Autoconverted folders are excluded. The full
-enumerable plan is also available to callers through `plan_test_tree()`.
-
-## Library
-
-```python
-from dwi_to_sm import convert_file, autoconvert_tree, dwi_to_sm
-
-convert_file("A.dwi")  # -> path, or None if A.sm exists
-convert_file("A.dwi", overwrite=True)  # -> path, clobbers A.sm
-autoconvert_tree("C:/Songs")  # -> [(folder, sm_paths, error), ...]
-dwi_to_sm(open("A.dwi").read())  # -> str, no disk access
-```
-
-Other helpers: `parse_dwi`, `convert_tree`, `scan_folder`,
-`find_convertible_folders`, `find_testable_folders`, `autoconvert_folder`,
-`test_folder`, `test_tree`, `plan_test_tree`, `run_planned_actions`,
-`is_autoconverted`, `clear_autoconversions`.
-
-## GUI
-
 Launch the asynchronous Tkinter interface with:
 
-```powershell
+```bash
 uv run python -m dwi_to_sm.gui
 ```
-
-Choose an action on `All songs`, a pack, or an individual song. The choice
-propagates to every lower layer; press `Run` once to execute the marked work.
-
-For a two-stage test workflow, enumerate `plan_test_tree()` and set each
-`PlannedAction.accepted` to `True` or `False`, then pass the actions to
-`run_planned_actions()`. Only explicitly accepted actions run.
-
-## GUI
-
-Launch the basic asynchronous Tkinter interface with:
-
-```powershell
-uv run python -m dwi_to_sm.gui
-```
-
-It scans the selected library in the background, groups songs as
-`All songs -> pack -> song`, and lets you mark each song for conversion,
-generated-output cleanup, or no action before running the selected work.
 
 ## Notes
 
