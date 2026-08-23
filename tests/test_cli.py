@@ -45,7 +45,8 @@ def test_cli_dry_run_test_mode_reports_songs_without_writing(tmp_path, reference
     output = capsys.readouterr().out
     assert "1 song(s) have both .dwi and .sm files" in output
     assert "1 .dwi file(s) would be compared" in output
-    assert str(reference_song) not in output
+    assert f"DRY  {reference_song}" in output
+    assert "     A.dwi -> A.sm.converted" in output
     assert not (reference_song / "A.sm.converted").exists()
 
 

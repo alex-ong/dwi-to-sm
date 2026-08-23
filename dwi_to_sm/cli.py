@@ -73,6 +73,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif args.test:
             if args.dry_run:
                 plans = plan_test_tree(target)
+                current_folder = None
+                for action in plans:
+                    folder = Path(action.source).parent
+                    if folder != current_folder:
+                        print(f"DRY  {folder}")
+                        current_folder = folder
+                    print(
+                        f"     {Path(action.source).name} -> "
+                        f"{Path(action.destination).name}"
+                    )
                 folders = {Path(action.source).parent for action in plans}
                 print(f"DRY  {len(folders)} song(s) have both .dwi and .sm files")
                 print(f"DRY  {len(plans)} .dwi file(s) would be compared")
