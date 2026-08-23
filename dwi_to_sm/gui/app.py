@@ -134,7 +134,7 @@ class App:
             "end",
             text=node.name,
             values=("", self._action_label(node.action)),
-            open=True,
+            open=node.kind == "all",
         )
         self.nodes[iid] = node
         self.node_iids[id(node)] = iid
@@ -156,6 +156,12 @@ class App:
         return {"convert": "Convert", "remove": "Remove conversion", "none": "None"}[action]
 
     def _cycle_action(self, event: tk.Event) -> str | None:
+        if event.state & 0x0008:
+            iid = self.tree.identify_row(event.y)
+            node = self.nodes.get(iid)
+            if node is not None and node.children:
+                self._toggle_subtree(iid, not bool(self.tree.item(iid, "open")))
+                return "break"
         if self.tree.identify_column(event.x) != "#2":
             return None
         iid = self.tree.identify_row(event.y)
@@ -166,6 +172,12 @@ class App:
         set_action(node, actions[(actions.index(node.action) + 1) % len(actions)])
         self._refresh_actions()
         return "break"
+
+    def _toggle_subtree(self, iid: str, open_state: bool) -> None:
+        self.tree.item(iid, open=open_state)
+        for child_iid in self.tree.get_children(iid):
+            if self.nodes[child_iid].children:
+                self._toggle_subtree(child_iid, open_state)
 
     def _refresh_actions(self) -> None:
         for iid, node in self.nodes.items():
@@ -193,6 +205,8 @@ class App:
         self.status_bars[iid].configure(
             style=self._conversion_style(node), value=node.progress
         )
+        if node.progress == 100 and node.children:
+            self.tree.item(iid, open=False)
 
     def _refresh_ancestors(self, node: TreeNode) -> None:
         current: TreeNode | None = node
