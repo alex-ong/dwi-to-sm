@@ -21,11 +21,13 @@ class App:
         self.events: queue.Queue[object] = queue.Queue()
         self.nodes: dict[str, TreeNode] = {}
         self.status_bars: dict[str, ttk.Progressbar] = {}
+        self.action_buttons: dict[str, ttk.Button] = {}
         self.node_iids: dict[int, str] = {}
         self.node_parents: dict[int, TreeNode | None] = {}
         self.song_nodes: dict[Path, TreeNode] = {}
         self.tree_root: TreeNode | None = None
-        self.status = tk.StringVar(value="Select a song folder to begin.")
+        self.folders_expanded = False
+        self.status = tk.StringVar(value="Select a Songs folder to begin.")
         self.total_progress = ttk.Progressbar(root, mode="determinate")
         self._build()
         self.root.after(100, self._poll)
@@ -37,11 +39,16 @@ class App:
     def _build(self) -> None:
         toolbar = ttk.Frame(self.root, padding=8)
         toolbar.pack(fill="x")
-        self.choose_button = ttk.Button(toolbar, text="Choose folder", command=self.choose_folder)
+        self.choose_button = ttk.Button(toolbar, text="Choose Songs folder", command=self.choose_folder)
         self.choose_button.pack(side="left")
+        self.toggle_folders_button = ttk.Button(
+            toolbar, text="Expand all folders", command=self._toggle_all_folders
+        )
+        self.toggle_folders_button.pack(side="left")
         self.run_button = ttk.Button(toolbar, text="Run", command=self.run_selected)
         self.run_button.configure(state="disabled")
         self.run_button.pack(side="left", padx=8)
+
         ttk.Label(toolbar, textvariable=self.status).pack(side="left", padx=8)
 
         body = ttk.Frame(self.root, padding=(8, 0, 8, 8))
@@ -56,8 +63,13 @@ class App:
         self.tree.heading("autoconverted", text="Converted")
         self.tree.heading("action", text="Action")
         style = ttk.Style(self.root)
+        style.configure("Treeview", rowheight=28)
         style.configure("ConvertedGreen.Horizontal.TProgressbar", background="#34a853")
         style.configure("ConvertedRed.Horizontal.TProgressbar", background="#d93025")
+        self._configure_action_style(style, "ActionConvert.TButton", "#34a853", "#2d9248")
+        self._configure_action_style(style, "ActionRemove.TButton", "#d93025", "#bb2419")
+        self._configure_action_style(style, "ActionNone.TButton", "#80868b", "#6f7478")
+        style.configure("ActionFlash.TButton", background="#fbbc04", foreground="black")
         self.tree.column("#0", width=500)
         self.tree.column("autoconverted", width=120, anchor="center")
         self.tree.column("action", width=150, anchor="center")
@@ -83,13 +95,17 @@ class App:
 
     def _place_widgets(self) -> None:
         for iid, widget in self.status_bars.items():
-            column = "#1"
-            box = self.tree.bbox(iid, column)
-            if not box:
-                widget.place_forget()
-                continue
-            x, y, width, height = box
-            widget.place(x=x + 3, y=y + 2, width=max(10, width - 6), height=max(10, height - 4))
+            self._place_widget(iid, widget, "#1")
+        for iid, widget in self.action_buttons.items():
+            self._place_widget(iid, widget, "#2")
+
+    def _place_widget(self, iid: str, widget: ttk.Widget, column: str) -> None:
+        box = self.tree.bbox(iid, column)
+        if not box:
+            widget.place_forget()
+            return
+        x, y, width, height = box
+        widget.place(x=x + 3, y=y + 3, width=max(10, width - 6), height=max(10, height - 6))
 
     def choose_folder(self) -> None:
         selected = filedialog.askdirectory(title="Choose song library")
@@ -110,18 +126,26 @@ class App:
     def _populate(self, result: ScanResult) -> None:
         for widget in (
             *self.status_bars.values(),
+            *self.action_buttons.values(),
         ):
             widget.destroy()
         self.status_bars.clear()
+        self.action_buttons.clear()
         self.nodes.clear()
         self.node_iids.clear()
         self.node_parents.clear()
         self.song_nodes.clear()
         self.tree_root = result.tree
+        if self.tree_root is not None:
+            set_action(self.tree_root, "convert")
+        self.folders_expanded = False
+        self.toggle_folders_button.configure(text="Expand all folders")
         self.tree.delete(*self.tree.get_children())
         if self.tree_root is not None:
             self._insert_node("", self.tree_root)
         self.root.after_idle(self._place_widgets)
+        if self.tree_root is not None:
+            self.root.after(250, self._flash_root_action)
         self.status.set(f"Dry run complete: {len(result.songs)} song folders found.")
         self._set_enabled(True)
         self._update_run_state()
@@ -148,6 +172,7 @@ class App:
             value=node.progress,
             style=self._conversion_style(node),
         )
+        self.action_buttons[iid] = self._make_action_button(node)
         for child in node.children:
             self._insert_node(iid, child, node)
 
@@ -156,12 +181,6 @@ class App:
         return {"convert": "Convert", "remove": "Remove conversion", "none": "None"}[action]
 
     def _cycle_action(self, event: tk.Event) -> str | None:
-        if event.state & 0x0008:
-            iid = self.tree.identify_row(event.y)
-            node = self.nodes.get(iid)
-            if node is not None and node.children:
-                self._toggle_subtree(iid, not bool(self.tree.item(iid, "open")))
-                return "break"
         if self.tree.identify_column(event.x) != "#2":
             return None
         iid = self.tree.identify_row(event.y)
@@ -173,16 +192,74 @@ class App:
         self._refresh_actions()
         return "break"
 
-    def _toggle_subtree(self, iid: str, open_state: bool) -> None:
+    def _make_action_button(self, node: TreeNode) -> ttk.Button:
+        return ttk.Button(
+            self.tree,
+            text=self._action_label(node.action),
+            style=self._action_style(node.action),
+            command=lambda: self._cycle_node_action(node),
+        )
+
+    def _cycle_node_action(self, node: TreeNode) -> None:
+        actions: tuple[Action, ...] = ("none", "convert", "remove")
+        set_action(node, actions[(actions.index(node.action) + 1) % len(actions)])
+        self._refresh_actions()
+
+    def _toggle_all_folders(self) -> None:
+        self.folders_expanded = not self.folders_expanded
+        if self.tree_root is None:
+            return
+        root_iid = self.node_iids[id(self.tree_root)]
+        for child_iid in self.tree.get_children(root_iid):
+            self._set_subtree_open(child_iid, self.folders_expanded)
+        self.toggle_folders_button.configure(
+            text="Close all folders" if self.folders_expanded else "Expand all folders"
+        )
+
+    def _set_subtree_open(self, iid: str, open_state: bool) -> None:
         self.tree.item(iid, open=open_state)
         for child_iid in self.tree.get_children(iid):
             if self.nodes[child_iid].children:
-                self._toggle_subtree(child_iid, open_state)
+                self._set_subtree_open(child_iid, open_state)
 
     def _refresh_actions(self) -> None:
         for iid, node in self.nodes.items():
             self.tree.set(iid, "action", self._action_label(node.action))
+            self.action_buttons[iid].configure(
+                text=self._action_label(node.action), style=self._action_style(node.action)
+            )
         self._update_run_state()
+
+    def _flash_root_action(self, remaining: int = 11) -> None:
+        if self.tree_root is None or remaining <= 0:
+            return
+        iid = self.node_iids[id(self.tree_root)]
+        button = self.action_buttons[iid]
+        button.configure(style="ActionFlash.TButton" if remaining % 2 else "ActionConvert.TButton")
+        self.root.after(120, self._flash_root_action, remaining - 1)
+
+    @staticmethod
+    def _action_style(action: Action) -> str:
+        return {
+            "convert": "ActionConvert.TButton",
+            "remove": "ActionRemove.TButton",
+            "none": "ActionNone.TButton",
+        }[action]
+
+    @staticmethod
+    def _configure_action_style(
+        style: ttk.Style, name: str, background: str, active_background: str
+    ) -> None:
+        style.configure(name, background=background, foreground="black")
+        style.map(
+            name,
+            background=[
+                ("pressed", active_background),
+                ("active", active_background),
+                ("disabled", "#c4c7c5"),
+            ],
+            foreground=[("disabled", "#6b6f6d"), ("!disabled", "black")],
+        )
 
     def _update_run_state(self) -> None:
         if self.choose_button.instate(["disabled"]):
@@ -205,8 +282,6 @@ class App:
         self.status_bars[iid].configure(
             style=self._conversion_style(node), value=node.progress
         )
-        if node.progress == 100 and node.children:
-            self.tree.item(iid, open=False)
 
     def _refresh_ancestors(self, node: TreeNode) -> None:
         current: TreeNode | None = node
@@ -261,6 +336,9 @@ class App:
         state = "normal" if enabled else "disabled"
         self.choose_button.configure(state=state)
         self.run_button.configure(state=state)
+        for button in self.action_buttons.values():
+            button.configure(state=state)
+        self.toggle_folders_button.configure(state=state)
         if enabled:
             self._update_run_state()
 
